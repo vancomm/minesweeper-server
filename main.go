@@ -5,22 +5,53 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/gorilla/schema"
 )
 
 var requiredParams = []string{"w", "h", "b"}
 
+type FieldParams struct {
+	height int
+	width  int
+	bombs  int
+}
+
+var decoder = schema.NewDecoder()
+
+func parseFieldParams(r *http.Request, paramName string) (int, error) {
+	var (
+		param int
+		err   error
+	)
+
+	rawParam := r.URL.Query().Get(paramName)
+	if rawParam == "" {
+		err = fmt.Errorf("missing param %s", paramName)
+		return param, err
+	}
+
+	if _, err := fmt.Sscan(rawParam, &param); err != nil {
+		err = fmt.Errorf("invalid param %s: must be integer", paramName)
+		return param, err
+	}
+
+	return param, err
+}
+
 func handleGetField(w http.ResponseWriter, r *http.Request) {
 	var buf strings.Builder
 	buf.WriteString("your search params: ")
+
 	for _, paramName := range requiredParams {
-		param := r.URL.Query().Get(paramName)
-		if param == "" {
+		param, err := parseFieldParams(r, paramName)
+		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintf(w, "missing param: %s", paramName)
-			return
+			fmt.Fprintln(w, err)
 		}
-		fmt.Fprintf(&buf, "%s: %s, ", paramName, param)
+		fmt.Fprintf(&buf, "%s: %d", paramName, param)
 	}
+
 	response := strings.TrimSuffix(buf.String(), ", ")
 	fmt.Fprintln(w, response)
 }
