@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -9,27 +9,41 @@ import (
 )
 
 type QueryParams struct {
-	Height int `schema:"height"`
-	Width  int `schema:"width"`
-	Bombs  int `schema:"bombs"`
+	Height int `schema:"height,required"`
+	Width  int `schema:"width,required"`
+	Bombs  int `schema:"bombs,required"`
 }
 
-var decoder = schema.NewDecoder()
+var schemaDecoder = schema.NewDecoder()
+
+func sendJson(w http.ResponseWriter, p any) error {
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(p)
+}
 
 func handleGetField(w http.ResponseWriter, r *http.Request) {
 	var query QueryParams
-	if err := decoder.Decode(&query, r.URL.Query()); err != nil {
+	if err := schemaDecoder.Decode(&query, r.URL.Query()); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, err)
+		if merr, ok := err.(schema.MultiError); ok {
+			errPayload := make(map[string]string)
+			for k, v := range merr {
+				errPayload[k] = v.Error()
+			}
+			payload := make(map[string]any)
+			payload["errors"] = errPayload
+			sendJson(w, payload)
+		} else {
+			log.Printf("not ok, err: %v\n", err)
+		}
 		return
 	}
-	response := fmt.Sprintf("query: %v\n", query)
-	log.Print(response)
-	fmt.Fprint(w, response)
+	field := CreateSolvableField(query.Height, query.Width, query.Bombs)
+	sendJson(w, field)
 }
 
 func main() {
-
+	schemaDecoder.IgnoreUnknownKeys(true)
 	router := http.NewServeMux()
 
 	router.HandleFunc("GET /field", handleGetField)
