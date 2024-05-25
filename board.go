@@ -200,18 +200,22 @@ func (b Board) findSharedCoveredUnflaggedNeighbors(first *Cell, second *Cell) []
 
 func (b *Board) updateCells() bool {
 	for index, cell := range Duplicate(b.interestingCells) {
-		cell.remainingMines()
 		var (
 			remainingMines        = cell.remainingMines()
 			coveredUnflaggedCount = len(cell.neighborsCoveredUnflagged)
+			localLog              = log.WithFields(logrus.Fields{
+				"cell": cell,
+			})
 		)
 		// check if interesting
 		if coveredUnflaggedCount == 0 {
+			localLog.Debug("cell has no covered unflagged neighbors")
 			RemoveAt(&b.interestingCells, index)
 			return true
 		}
 		// remaining mines == 0
 		if remainingMines == 0 {
+			localLog.Debug("there are no mines remaining")
 			RemoveAt(&b.interestingCells, index)
 			for _, neighbor := range Duplicate(cell.neighborsCoveredUnflagged) {
 				b.uncover(neighbor)
@@ -220,6 +224,7 @@ func (b *Board) updateCells() bool {
 		}
 		// remaining mines == unflagged squares
 		if remainingMines == coveredUnflaggedCount {
+			localLog.Debug("all remaining mines are cell's neighbors")
 			RemoveAt(&b.interestingCells, index)
 			for _, neighbor := range Duplicate(cell.neighborsCoveredUnflagged) {
 				b.flag(neighbor)
@@ -232,12 +237,22 @@ func (b *Board) updateCells() bool {
 			return true
 		}
 		// shared neighbors
-		for _, neighbor := range b.findExtendedUncoveredNeighbors(cell) {
-			var sharedNeighbors = b.findSharedCoveredUnflaggedNeighbors(cell, neighbor)
-			// log.WithField("shared", shared_neighbors).Debug("found shared neighbors")
+		var extendedNeighbors = b.findExtendedUncoveredNeighbors(cell)
+		localLog = log.WithFields(logrus.Fields{
+			"extendedNeighbors": extendedNeighbors,
+		})
+		localLog.Debug("inspecting extended neighbors")
+		for _, extNeighbor := range extendedNeighbors {
+			var sharedNeighbors = b.findSharedCoveredUnflaggedNeighbors(cell, extNeighbor)
+			localLog = localLog.WithFields(logrus.Fields{
+				"neighbor":          extNeighbor,
+				"extendedNeighbors": extendedNeighbors,
+				"sharedNeighbors":   sharedNeighbors,
+			})
+			localLog.Debug("start inspecting neighbor")
 			if len(sharedNeighbors) < len(cell.neighborsCoveredUnflagged) {
 				// flag all cells that are definitely mines
-				if len(cell.neighborsCoveredUnflagged)-len(sharedNeighbors) == cell.remainingMines()-neighbor.remainingMines() {
+				if len(cell.neighborsCoveredUnflagged)-len(sharedNeighbors) == cell.remainingMines()-extNeighbor.remainingMines() {
 					for _, n := range Duplicate(cell.neighborsCoveredUnflagged) {
 						if !Contains(sharedNeighbors, n) {
 							b.flag(n)
@@ -246,8 +261,8 @@ func (b *Board) updateCells() bool {
 					return true
 				}
 				// uncover all cells that are definitely not mines
-				if len(sharedNeighbors) == len(neighbor.neighborsCoveredUnflagged) {
-					if neighbor.remainingMines() == cell.remainingMines() {
+				if len(sharedNeighbors) == len(extNeighbor.neighborsCoveredUnflagged) {
+					if extNeighbor.remainingMines() == cell.remainingMines() {
 						for _, n := range Duplicate(cell.neighborsCoveredUnflagged) {
 							if !Contains(sharedNeighbors, n) {
 								b.uncover(n)

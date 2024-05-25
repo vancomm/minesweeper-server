@@ -57,7 +57,7 @@ func handleGetBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ok := board.Solvable(); ok {
+	if ok := board.Solvable(); !ok {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.WithField("board", board).Fatal("could not find a solvable board")
 	}
