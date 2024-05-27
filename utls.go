@@ -1,5 +1,13 @@
 package main
 
+func If[T any](condition bool, value T, alternative T) T {
+	if condition {
+		return value
+	} else {
+		return alternative
+	}
+}
+
 func SumInt(values ...int) (sum int) {
 	for _, v := range values {
 		sum += v
@@ -22,13 +30,14 @@ type Equaler[T any] interface {
 }
 
 // O(n)
-func IndexOf[T Equaler[T]](arr []*T, element *T) (int, bool) {
-	for index, item := range arr {
-		if (*element).Equal(*item) {
-			return index, true
+func IndexOf[T Equaler[T]](arr []*T, element *T) (index int, ok bool) {
+	var item *T
+	for index, item = range arr {
+		if ok = (*element).Equal(*item); ok {
+			return
 		}
 	}
-	return -1, false
+	return
 }
 
 // O(n)
@@ -38,8 +47,7 @@ func Contains[T Equaler[T]](arr []*T, element *T) (ok bool) {
 }
 
 // O(n * m) (excluding copy and remove)
-func Intersect[T Equaler[T]](left []*T, right []*T) []*T {
-	var result []*T
+func Intersect[T Equaler[T]](left []*T, right []*T) (result []*T) {
 	for i := len(left) - 1; i >= 0; i-- {
 		if Contains(right, left[i]) {
 			result = append(result, left[i])
@@ -49,8 +57,7 @@ func Intersect[T Equaler[T]](left []*T, right []*T) []*T {
 }
 
 // O(n * m) (excluding copy and remove)
-func Complement[T Equaler[T]](left []*T, right []*T) []*T {
-	var result []*T
+func Complement[T Equaler[T]](left []*T, right []*T) (result []*T) {
 	for i := len(right) - 1; i >= 0; i-- {
 		if Contains(left, right[i]) {
 			result = append(result, right[i])
@@ -59,28 +66,25 @@ func Complement[T Equaler[T]](left []*T, right []*T) []*T {
 	return result
 }
 
-func Filter[T any](arr []*T, check func(*T) bool) []*T {
-	var result []*T
+func Filter[T any](arr []T, check func(T) bool) (result []*T) {
 	for _, item := range arr {
 		if check(item) {
-			result = append(result, item)
+			result = append(result, &item)
 		}
 	}
 	return result
 }
 
-func FilterEqual[T Equaler[T]](arr []*T, element *T) []*T {
-	var result []*T
-	for _, item := range arr {
-		if !(*element).Equal(*item) {
-			result = append(result, item)
-		}
+func Without[T Equaler[T]](arr []*T, element *T) []*T {
+	index, ok := IndexOf(arr, element)
+	if !ok {
+		return arr
 	}
-	return result
+	return append(arr[:index], arr[index+1:]...)
 }
 
-func Map[T, R any](arr []*T, mapFn func(*T) *R) []*R {
-	var result = make([]*R, len(arr))
+func Map[T, R any](arr []*T, mapFn func(*T) *R) (result []*R) {
+	result = make([]*R, len(arr))
 	for index, item := range arr {
 		result[index] = mapFn(item)
 	}
