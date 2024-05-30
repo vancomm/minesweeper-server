@@ -72,10 +72,16 @@ func handleStart(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	sessions[token] = &session{
-		board: &board,
+
+	if solved := board.Solvable(1e4); solved {
+		sessions[token] = &session{
+			board: &board,
+		}
+		fmt.Fprint(w, token)
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "could not generate a solvable field with passed parameters")
 	}
-	fmt.Fprint(w, token)
 }
 
 func handleGetBoard(w http.ResponseWriter, r *http.Request) {

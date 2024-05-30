@@ -45,8 +45,8 @@ func NewCell(x int, y int) Cell {
 }
 
 type Board struct {
-	Height    int `schema:"height,required"`
-	Width     int `schema:"width,required"`
+	Rows      int `schema:"rows,required"`
+	Cols      int `schema:"cols,required"`
 	Mines     int `schema:"mines,required"`
 	FirstMove int `schema:"firstMove,required"`
 	cells     []Cell
@@ -58,11 +58,11 @@ func (b Board) Won() bool {
 }
 
 func (b Board) indexToCoords(index int) (int, int) {
-	return index / b.Height, index % b.Height
+	return index / b.Rows, index % b.Rows
 }
 
 func (b Board) coordsToIndex(x, y int) int {
-	return x*b.Width + y
+	return x*b.Cols + y
 }
 
 func (b Board) Cells() []Cell {
@@ -74,7 +74,7 @@ func (b Board) MinedCells() []*Cell {
 }
 
 func (b *Board) resetCells() {
-	var boardSize = b.Height * b.Width
+	var boardSize = b.Rows * b.Cols
 	b.cells = make([]Cell, boardSize)
 	b.flagCount = 0
 	for index := range boardSize {
@@ -87,13 +87,13 @@ func (b *Board) resetCells() {
 }
 
 func (b *Board) connectNeighbors() {
-	var boardSize = b.Height * b.Width
+	var boardSize = b.Rows * b.Cols
 	for index := range boardSize {
 		var (
 			x, y             = b.indexToCoords(index)
 			cell             = b.cells[index]
-			prevRow, nextRow = max(0, x-1), min(x+1, b.Height-1)
-			prevCol, nextCol = max(0, y-1), min(y+1, b.Width-1)
+			prevRow, nextRow = max(0, x-1), min(x+1, b.Rows-1)
+			prevCol, nextCol = max(0, y-1), min(y+1, b.Cols-1)
 			rows, cols       = (nextRow - prevRow + 1), (nextCol - prevCol + 1)
 			neighborCount    = rows*cols - 1
 			neighborNum      = 0
@@ -111,14 +111,14 @@ func (b *Board) connectNeighbors() {
 	}
 }
 
-func (b *Board) init() {
+func (b *Board) Init() {
 	b.resetCells()
 	b.connectNeighbors()
 }
 
-func (b *Board) randomizeMines() {
+func (b *Board) RandomizeMines() {
 	var (
-		boardSize    = b.Height * b.Width
+		boardSize    = b.Rows * b.Cols
 		plantedMines = 0
 	)
 	for plantedMines < b.Mines {
@@ -165,18 +165,22 @@ func (b *Board) Uncover(cell *Cell) (updated []Cell, boom bool) {
 }
 
 func (b *Board) Solvable(maxTries int) (solved bool) {
-	for tries := 0; tries <= maxTries && !solved; tries++ {
+	var tries int
+	for tries = 0; (tries <= maxTries) && !solved; tries++ {
 		log.WithFields(logrus.Fields{
 			"board":    b,
 			"mines":    b.MinedCells(),
 			"maxTries": maxTries,
 			"tries":    tries,
 		}).Debug("starting solving attempt")
-		b.init()
-		b.randomizeMines()
+
+		b.Init()
+		b.RandomizeMines()
 		var solver = NewSolver(*b)
 		solved = solver.Solve()
 	}
-	log.Debug("finished solving")
+
+	log.WithFields(logrus.Fields{"solved": solved, "tries": tries}).Debug("done solving")
+
 	return
 }

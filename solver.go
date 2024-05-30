@@ -12,10 +12,11 @@ type Solver struct {
 
 func NewSolver(board Board) Solver {
 	return Solver{
-		height:    board.Height,
-		width:     board.Width,
+		height:    board.Rows,
+		width:     board.Cols,
 		firstMove: board.FirstMove,
 		cells:     Duplicate(board.cells),
+		mines:     board.Mines,
 	}
 }
 
