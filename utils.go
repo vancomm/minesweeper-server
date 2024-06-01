@@ -1,5 +1,9 @@
 package main
 
+type void struct{}
+
+type Set[T comparable] map[T]void
+
 func If[T any](condition bool, value T, alternative T) T {
 	if condition {
 		return value

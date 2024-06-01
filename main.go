@@ -10,11 +10,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/schema"
 	"github.com/sirupsen/logrus"
+	"github.com/vancomm/minesweeper-server/game"
+	"github.com/vancomm/minesweeper-server/solver"
 )
 
-var (
-	log *logrus.Logger
-)
+var log *logrus.Logger
 
 func init() {
 	log = logrus.New()
@@ -29,10 +29,10 @@ func init() {
 }
 
 type session struct {
-	board *Board
+	*game.Game
 }
 
-var sessions = make(map[string]*session)
+var sessions = map[string]*session{}
 
 var schemaDecoder *schema.Decoder
 
@@ -49,50 +49,16 @@ func sendJson(w http.ResponseWriter, p any) error {
 func handleStart(w http.ResponseWriter, r *http.Request) {
 	var (
 		token = uuid.NewString()
-		board Board
+		game  game.Game
 	)
-	err := schemaDecoder.Decode(&board, r.URL.Query())
+
+	err := schemaDecoder.Decode(&game, r.URL.Query())
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		var (
-			errors  = &map[string]string{}
-			payload = map[string]any{
-				"errors": errors,
-			}
+			errors  = map[string]string{}
+			payload = map[string]any{"errors": errors}
 		)
-		if merr, ok := err.(schema.MultiError); ok {
-			for k, v := range merr {
-				(*errors)[k] = v.Error()
-			}
-		} else {
-			(*errors)["schema"] = err.Error()
-		}
-		if err := sendJson(w, payload); err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
-
-	if solved := board.Solvable(1e4); solved {
-		sessions[token] = &session{
-			board: &board,
-		}
-		fmt.Fprint(w, token)
-	} else {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, "could not generate a solvable field with passed parameters")
-	}
-}
-
-func handleGetBoard(w http.ResponseWriter, r *http.Request) {
-	var board Board
-	if err := schemaDecoder.Decode(&board, r.URL.Query()); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		var (
-			payload = make(map[string]any)
-			errors  = make(map[string]string)
-		)
-		payload["errors"] = errors
 		if merr, ok := err.(schema.MultiError); ok {
 			for k, v := range merr {
 				errors[k] = v.Error()
@@ -106,33 +72,76 @@ func handleGetBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var maxAttempts = 1_000
-	if ok := board.Solvable(int(maxAttempts)); !ok {
-		var message = fmt.Sprintf("could not find a solvable board in %d attempts", maxAttempts)
-		w.WriteHeader(http.StatusInternalServerError)
-		var payload = make(map[string]any)
-		payload["error"] = message
-		sendJson(w, payload)
-		log.WithFields(logrus.Fields{
-			"board": board,
-		}).Error(message)
-		return
+	var (
+		solver       = solver.Solver{Game: &game}
+		solved       = false
+		maxTries int = 1e4
+		tries    int
+	)
+
+	for ; !solved && tries < maxTries; tries++ {
+		firstUpdate := game.Random()
+		solved = solver.Solve(firstUpdate)
+		game.ResetBoard()
 	}
-
-	var payload = board.Cells()
-
-	if err := sendJson(w, payload); err != nil {
-		log.WithFields(logrus.Fields{
-			"board":   board,
-			"payload": payload,
-		}).Fatal(err)
+	if solved {
+		sessions[token] = &session{&game}
+		fmt.Fprint(w, token)
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "could not generate a solvable field with passed parameters")
 	}
 }
+
+// func handleGetBoard(w http.ResponseWriter, r *http.Request) {
+// 	var board Board
+// 	if err := schemaDecoder.Decode(&board, r.URL.Query()); err != nil {
+// 		w.WriteHeader(http.StatusBadRequest)
+// 		var (
+// 			payload = make(map[string]any)
+// 			errors  = make(map[string]string)
+// 		)
+// 		payload["errors"] = errors
+// 		if merr, ok := err.(schema.MultiError); ok {
+// 			for k, v := range merr {
+// 				errors[k] = v.Error()
+// 			}
+// 		} else {
+// 			errors["schema"] = err.Error()
+// 		}
+// 		if err := sendJson(w, payload); err != nil {
+// 			log.Fatal(err)
+// 		}
+// 		return
+// 	}
+
+// 	var maxAttempts = 1_000
+// 	if ok := board.Solvable(int(maxAttempts)); !ok {
+// 		var message = fmt.Sprintf("could not find a solvable board in %d attempts", maxAttempts)
+// 		w.WriteHeader(http.StatusInternalServerError)
+// 		var payload = make(map[string]any)
+// 		payload["error"] = message
+// 		sendJson(w, payload)
+// 		log.WithFields(logrus.Fields{
+// 			"board": board,
+// 		}).Error(message)
+// 		return
+// 	}
+
+// 	var payload = board.Cells()
+
+// 	if err := sendJson(w, payload); err != nil {
+// 		log.WithFields(logrus.Fields{
+// 			"board":   board,
+// 			"payload": payload,
+// 		}).Fatal(err)
+// 	}
+// }
 
 func main() {
 	log.Info("starting server")
 	var router = http.NewServeMux()
-	router.HandleFunc("GET /board", handleGetBoard)
+	// router.HandleFunc("GET /board", handleGetBoard)
 	router.HandleFunc("GET /start", handleStart)
 	var handler = LoggerMiddleware(router)
 	log.Fatal(http.ListenAndServe(":8080", handler))
