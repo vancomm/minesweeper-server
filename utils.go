@@ -4,16 +4,16 @@ type void struct{}
 
 type Set[T comparable] map[T]void
 
-func If[T any](condition bool, value T, alternative T) T {
-	if condition {
-		return value
+func Iif[T any](c bool, t T, f T) T {
+	if c {
+		return t
 	} else {
-		return alternative
+		return f
 	}
 }
 
-func SumInt(values ...int) (sum int) {
-	for _, v := range values {
+func SumInt(vs ...int) (sum int) {
+	for _, v := range vs {
 		sum += v
 	}
 	return
