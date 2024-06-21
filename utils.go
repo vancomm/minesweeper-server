@@ -94,3 +94,9 @@ func Map[T, R any](arr []*T, mapFn func(*T) *R) (result []*R) {
 	}
 	return result
 }
+
+func Assert(exp bool, message string) {
+	if !exp {
+		panic(message)
+	}
+}
