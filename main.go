@@ -8,15 +8,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func bitcount16(inword int) int {
-	word := (uint)(inword)
-	word = ((word & 0xAAAA) >> 1) + (word & 0x5555)
-	word = ((word & 0xCCCC) >> 2) + (word & 0x3333)
-	word = ((word & 0xF0F0) >> 4) + (word & 0x0F0F)
-	word = ((word & 0xFF00) >> 8) + (word & 0x00FF)
-	return (int)(word)
-}
-
 type SquareInfo int8
 
 const (
@@ -43,8 +34,8 @@ type square struct {
 type perturbdelta int8
 
 const (
-	ToMine  perturbdelta = 1
-	ToClear perturbdelta = -1
+	AssumeMine  perturbdelta = 1
+	AssumeClear perturbdelta = -1
 )
 
 type perturbation struct {
@@ -52,12 +43,16 @@ type perturbation struct {
 	delta perturbdelta
 }
 
-type perturbations struct {
-	n       int
-	changes []perturbation
-}
+type perturbcb func(ctx *minectx, grid []SquareInfo, setx, sety int, mask int) []*perturbation
 
-type perturbcb func(ctx *minectx, grid []SquareInfo, setx, sety, mask int) *perturbations
+func bitcount16(inword int) int {
+	word := (uint)(inword)
+	word = ((word & 0xAAAA) >> 1) + (word & 0x5555)
+	word = ((word & 0xCCCC) >> 2) + (word & 0x3333)
+	word = ((word & 0xF0F0) >> 4) + (word & 0x0F0F)
+	word = ((word & 0xFF00) >> 8) + (word & 0x00FF)
+	return (int)(word)
+}
 
 func absDiff(x, y int) int {
 	if x > y {
@@ -94,7 +89,7 @@ func squarecmp(a, b *square) int {
 	return 0
 }
 
-func minePerturb(ctx *minectx, grid []SquareInfo, setx, sety, mask int) (ret *perturbations) {
+func minePerturb(ctx *minectx, grid []SquareInfo, setx, sety int, mask int) (ret []*perturbation) {
 	if mask == 0 && !ctx.allowBigPerturbs {
 		return
 	}
@@ -258,27 +253,25 @@ func minePerturb(ctx *minectx, grid []SquareInfo, setx, sety, mask int) (ret *pe
 	if ntofill == nfull {
 		todo = tofill
 		ntodo = ntofill
-		dtodo = ToMine
-		dset = ToClear
+		dtodo = AssumeMine
+		dset = AssumeClear
 		toempty = nil
 	} else {
 		todo = toempty
 		ntodo = ntoempty
-		dtodo = ToClear
-		dset = ToMine
+		dtodo = AssumeClear
+		dset = AssumeMine
 		tofill = nil
 	}
 
-	ret = &perturbations{
-		n:       2 * ntodo,
-		changes: make([]perturbation, 2*ntodo),
-	}
-
 	var i int
-	for i = 0; i < ntodo; i++ {
-		ret.changes[i].x = todo[i].x
-		ret.changes[i].y = todo[i].y
-		ret.changes[i].delta = dtodo
+	ret = make([]*perturbation, 2*ntodo)
+	for i, t := range todo {
+		ret[i] = &perturbation{
+			x:     t.x,
+			y:     t.y,
+			delta: dtodo,
+		}
 	}
 
 	if setlist != nil {
@@ -287,22 +280,25 @@ func minePerturb(ctx *minectx, grid []SquareInfo, setx, sety, mask int) (ret *pe
 				"todo": todo, "toempty": toempty,
 			}).Fatal("todo must be ")
 		}
-		for j := 0; j < ntoempty; j++ {
-			ret.changes[i].x = setlist[j] % ctx.w
-			ret.changes[i].y = setlist[j] / ctx.w
-			ret.changes[i].delta = dset
+		for j := range ntoempty {
+			ret[i] = &perturbation{
+				x:     setlist[j] % ctx.w,
+				y:     setlist[j] / ctx.w,
+				delta: dset,
+			}
 			i++
 		}
-		setlist = nil
 	} else if mask != 0 {
 		for dy := range 3 {
 			for dx := range 3 {
 				if mask&(1<<(dy*3+dx)) != 0 {
-					currval := Iif(ctx.grid[(sety+dy)*ctx.w+(setx+dx)], ToMine, ToClear)
+					currval := Iif(ctx.grid[(sety+dy)*ctx.w+(setx+dx)], AssumeMine, AssumeClear)
 					if dset == -currval {
-						ret.changes[i].x = setx + dx
-						ret.changes[i].y = sety + dy
-						ret.changes[i].delta = dset
+						ret[i] = &perturbation{
+							x:     setx + dx,
+							y:     sety + dy,
+							delta: dset,
+						}
 						i++
 					}
 				}
@@ -312,11 +308,13 @@ func minePerturb(ctx *minectx, grid []SquareInfo, setx, sety, mask int) (ret *pe
 		for y := range ctx.h {
 			for x := range ctx.w {
 				if grid[y*ctx.w+x] == Unknown {
-					currval := Iif(ctx.grid[y*ctx.w+x], ToMine, ToClear)
+					currval := Iif(ctx.grid[y*ctx.w+x], AssumeMine, AssumeClear)
 					if dset == -currval {
-						ret.changes[i].x = x
-						ret.changes[i].y = y
-						ret.changes[i].delta = dset
+						ret[i] = &perturbation{
+							x:     x,
+							y:     y,
+							delta: dset,
+						}
 						i++
 					}
 				}
@@ -324,24 +322,24 @@ func minePerturb(ctx *minectx, grid []SquareInfo, setx, sety, mask int) (ret *pe
 		}
 	}
 
-	if i != ret.n { // assert
+	if i != len(ret) { // assert
 		log.WithFields(logrus.Fields{
-			"i": i, "ret.n": ret.n,
-		}).Fatal("i must equal ret.n")
+			"i": i, "ret.n": len(ret),
+		}).Fatal("some perturbations have not generated")
 	}
 
 	sqlist = nil
 	todo = nil
 
-	for i := range ret.n {
+	for _, p := range ret {
 		var (
-			x     = ret.changes[i].x
-			y     = ret.changes[i].y
-			delta = ret.changes[i].delta
+			x     = p.x
+			y     = p.y
+			delta = p.delta
 		)
 
 		if (delta < 0) == (!ctx.grid[y*ctx.w+x]) { // assert
-			log.Fatal("we are trying to add an existing mine or remove an absent one")
+			log.Fatal("trying to add an existing mine or remove an absent one")
 		}
 
 		ctx.grid[y*ctx.w+x] = (delta > 0)
@@ -838,18 +836,17 @@ func mineSolve(
 		}
 
 		nperturbs++
-		var ret *perturbations
+		var ret []*perturbation
 		if c := ss.sets.Count(); c == 0 {
 			ret = perturb(ctx, grid, 0, 0, 0)
 		} else {
 			s := ss.sets.Index(rand.IntN(c))
 			ret = perturb(ctx, grid, s.x, s.y, s.mask)
 		}
-		if ret != nil {
-			for i := range ret.n {
-				if ret.changes[i].delta < 0 &&
-					grid[ret.changes[i].y*w+ret.changes[i].x] != Unknown {
-					std.add(ret.changes[i].y*w+ret.changes[i].x)
+		if len(ret) > 0 {
+			for _, p := range ret {
+				if p.delta < 0 && grid[p.y*w+p.x] != Unknown {
+					std.add(p.y*w + p.x)
 				}
 			}
 		}
