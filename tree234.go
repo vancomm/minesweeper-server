@@ -322,19 +322,19 @@ func (t Tree234[T]) Index(index int) *T {
 	return nil
 }
 
-type Rel234 uint8
+type relation uint8
 
 const (
-	Rel234Eq Rel234 = iota
-	Rel234Lt
-	Rel234Le
-	Rel234Gt
-	Rel234Ge
+	Eq relation = iota
+	Lt
+	Le
+	Gt
+	Ge
 )
 
 func (t *Tree234[T]) FindRelPos(
 	e *T,
-	relation Rel234,
+	relation relation,
 ) (el *T, index int) {
 	if t.root == nil {
 		return
@@ -349,9 +349,9 @@ func (t *Tree234[T]) FindRelPos(
 	)
 	if e == nil { // fake comparison if e == nil
 		switch relation {
-		case Rel234Lt:
+		case Lt:
 			cmpret = 1 // e is always greater
-		case Rel234Gt:
+		case Gt:
 			cmpret = -1 // e is always smaller
 		default:
 			log.WithFields(logrus.Fields{
@@ -392,13 +392,13 @@ func (t *Tree234[T]) FindRelPos(
 			Element is found: it is n.elems[ecount] at tree index idx.
 			If relation is LE, EQ or GE we are done
 		*/
-		if relation != Rel234Lt && relation != Rel234Gt {
+		if relation != Lt && relation != Gt {
 			return n.elems[ecount], idx
 		}
 		/*
 			Otherwise we do an index lookup for previous or next element.
 		*/
-		if relation == Rel234Lt {
+		if relation == Lt {
 			idx--
 		} else {
 			idx++
@@ -412,7 +412,7 @@ func (t *Tree234[T]) FindRelPos(
 			But the element isn't there. So if our search relation is EQ, we're
 			doomed.
 		*/
-		if relation == Rel234Eq {
+		if relation == Eq {
 			return nil, -1
 		}
 
@@ -420,7 +420,7 @@ func (t *Tree234[T]) FindRelPos(
 			Otherwise, we must do an index lookup for idx-1 (if we're going left
 			- LE or LT) or index idx (if we're goind right - GE or GT)
 		*/
-		if relation == Rel234Lt || relation == Rel234Le {
+		if relation == Lt || relation == Le {
 			idx--
 		}
 
@@ -668,7 +668,7 @@ func (t *Tree234[T]) delpos234Internal(index int) (res *T) {
 }
 
 func (t *Tree234[T]) Del(e *T) *T {
-	el, index := t.FindRelPos(e, Rel234Eq)
+	el, index := t.FindRelPos(e, Eq)
 	if el == nil {
 		return nil
 	}
