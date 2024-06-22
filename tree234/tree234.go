@@ -25,18 +25,28 @@
  * SOFTWARE.
  */
 
-package main
+package tree234
 
 import "github.com/sirupsen/logrus"
 
-type Node234[T any] struct {
-	parent *Node234[T]
-	kids   [4]*Node234[T]
+var log = logrus.New()
+
+func iif[T any](c bool, t T, f T) T {
+	if c {
+		return t
+	} else {
+		return f
+	}
+}
+
+type node234[T any] struct {
+	parent *node234[T]
+	kids   [4]*node234[T]
 	counts [4]int
 	elems  [3]*T
 }
 
-func (n Node234[T]) size() int {
+func (n node234[T]) size() int {
 	if n.elems[2] != nil {
 		return 2
 	}
@@ -46,7 +56,7 @@ func (n Node234[T]) size() int {
 	return 0
 }
 
-func countNode234[T any](n *Node234[T]) (res int) {
+func countNode234[T any](n *node234[T]) (res int) {
 	if n == nil {
 		return
 	}
@@ -61,14 +71,14 @@ func countNode234[T any](n *Node234[T]) (res int) {
 	return
 }
 
-type cmpfn234[T any] func(x, y *T) int
+type CmpFn234[T any] func(x, y *T) int
 
 type Tree234[T any] struct {
-	root *Node234[T]
-	cmp  cmpfn234[T]
+	root *node234[T]
+	cmp  CmpFn234[T]
 }
 
-func NewTree234[T any](cmp cmpfn234[T]) *Tree234[T] {
+func New[T any](cmp CmpFn234[T]) *Tree234[T] {
 	return &Tree234[T]{
 		root: nil,
 		cmp:  cmp,
@@ -83,10 +93,10 @@ func (t Tree234[T]) Count() int {
 }
 
 func (t *Tree234[T]) add234Insert(
-	left *Node234[T],
+	left *node234[T],
 	e *T,
-	right *Node234[T],
-	n *Node234[T],
+	right *node234[T],
+	n *node234[T],
 	ki int,
 ) (rootSplit bool) {
 	var (
@@ -146,7 +156,7 @@ func (t *Tree234[T]) add234Insert(
 			}
 			break
 		} else {
-			var m = &Node234[T]{parent: n.parent}
+			var m = &node234[T]{parent: n.parent}
 			/*
 				insert a 4-node:
 				split into 2-node and 3-node
@@ -239,7 +249,7 @@ func (t *Tree234[T]) add234Insert(
 		}
 		return false
 	} else {
-		t.root = &Node234[T]{}
+		t.root = &node234[T]{}
 		t.root.kids[0], t.root.counts[0] = left, lcount
 		t.root.elems[0] = e
 		t.root.kids[1], t.root.counts[1] = right, rcount
@@ -258,9 +268,9 @@ func (t *Tree234[T]) addInternal(e *T, index int) *T {
 	)
 
 	if t.root == nil {
-		t.root = &Node234[T]{
+		t.root = &node234[T]{
 			parent: nil,
-			kids:   [4]*Node234[T]{},
+			kids:   [4]*node234[T]{},
 			counts: [4]int{},
 			elems:  [3]*T{e},
 		}
@@ -268,7 +278,7 @@ func (t *Tree234[T]) addInternal(e *T, index int) *T {
 	}
 
 	var (
-		n  *Node234[T] = t.root
+		n  *node234[T] = t.root
 		ki int
 	)
 	for n != nil {
@@ -347,10 +357,10 @@ func (t Tree234[T]) Index(index int) *T {
 	return nil
 }
 
-type relation uint8
+type Relation uint8
 
 const (
-	Eq relation = iota
+	Eq Relation = iota
 	Lt
 	Le
 	Gt
@@ -359,7 +369,7 @@ const (
 
 func (t *Tree234[T]) FindRelPos(
 	e *T,
-	relation relation,
+	relation Relation,
 ) (el *T, index int) {
 	if t.root == nil {
 		return
@@ -389,7 +399,7 @@ func (t *Tree234[T]) FindRelPos(
 			if kcount >= 3 || n.elems[kcount] == nil {
 				break
 			}
-			c := Iif(cmpret != 0, cmpret, cmp(e, n.elems[kcount]))
+			c := iif(cmpret != 0, cmpret, cmp(e, n.elems[kcount]))
 			if c < 0 {
 				break
 			}
@@ -454,7 +464,7 @@ func (t *Tree234[T]) FindRelPos(
 	return ret, idx
 }
 
-func trans234SubtreeRight[T any](n *Node234[T], ki int) (k, index int) {
+func trans234SubtreeRight[T any](n *node234[T], ki int) (k, index int) {
 	var (
 		src  = n.kids[ki]
 		dest = n.kids[ki+1]
@@ -502,7 +512,7 @@ func trans234SubtreeRight[T any](n *Node234[T], ki int) (k, index int) {
 	return
 }
 
-func trans234SubtreeLeft[T any](n *Node234[T], ki int) (k, index int) {
+func trans234SubtreeLeft[T any](n *node234[T], ki int) (k, index int) {
 	var (
 		src  = n.kids[ki]
 		dest = n.kids[ki-1]
@@ -552,7 +562,7 @@ func trans234SubtreeLeft[T any](n *Node234[T], ki int) (k, index int) {
 	return
 }
 
-func trans234SubtreeMerge[T any](n *Node234[T], ki int) (k, index int) {
+func trans234SubtreeMerge[T any](n *node234[T], ki int) (k, index int) {
 	var (
 		left, leftlen   = n.kids[ki], n.counts[ki]
 		right, rightlen = n.kids[ki+1], n.counts[ki+1]
@@ -628,7 +638,7 @@ func (t *Tree234[T]) delpos234Internal(index int) (res *T) {
 			}
 			ki++
 			index = 0
-			m := &Node234[T]{}
+			m := &node234[T]{}
 			for m = n.kids[ki]; m.kids[0] != nil; m = m.kids[0] {
 				continue
 			}
