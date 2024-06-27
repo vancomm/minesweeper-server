@@ -284,16 +284,20 @@ func (std *squaretodo) add(i int) {
 	std.next[i] = -1
 }
 
-type (
-	squareInfo int8
-	gridInfo   []squareInfo
-	openFn     func(*minectx, int, int) squareInfo
-)
+type squareInfo int8
 
 const (
-	Unknown squareInfo = iota - 2
-	Mine
+	Unknown     squareInfo = -2
+	Mine        squareInfo = -1
+	CorrectFlag squareInfo = 64
+	Exploded    squareInfo = 65
+	WrongFlag   squareInfo = 66
 	// 0-8 for empty with given number of mined neighbors
+)
+
+type (
+	gridInfo []squareInfo
+	openFn   func(*minectx, int, int) squareInfo
 )
 
 func (grid *gridInfo) knownSquares(

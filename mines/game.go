@@ -15,11 +15,19 @@ type MineLayout struct {
 	Unique    bool
 }
 
+func NewLayout(params GameParams, x, y int) *MineLayout {
+	return &MineLayout{
+		Mines:     MineGen(params, x, y),
+		MineCount: params.MineCount,
+		Unique:    params.Unique,
+	}
+}
+
 type GameState struct {
-	Width, Height, MineCount int
-	Dead, Won, UsedSolve     bool
-	Layout                   *MineLayout /* real mine positions */
-	Grid                     []bool      /* player knowledge */
+	GameParams
+	Dead, Won, UsedSolve bool
+	Layout               MineLayout   /* real mine positions */
+	Grid                 []squareInfo /* player knowledge */
 	/*
 	 * Each item in the `grid' array is one of the following values:
 	 *
@@ -44,7 +52,24 @@ type GameState struct {
 	 */
 }
 
-func New() *GameState {
-	state := &GameState{}
-	return state
+func (s *GameState) OpenSquare(x, y int) int {
+	i := y*s.Width + x
+	if s.Layout.Mines[i] {
+		/*
+		 * The player has landed on a mine. Bad luck. Expose the
+		 * mine that killed them, but not the rest (in case they
+		 * want to Undo and carry on playing).
+		 */
+		s.Dead = true
+		s.Grid[i] = Exploded
+		return -1
+	}
+	return 0
+}
+
+func New(params GameParams, x, y int) *GameState {
+	return &GameState{
+		GameParams: params,
+		Layout:     *NewLayout(params, x, y),
+	}
 }

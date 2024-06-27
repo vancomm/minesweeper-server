@@ -487,8 +487,12 @@ const (
 	// values >0 mean given number of perturbations was required
 )
 
-func MineGen(w, h, n, x, y int, unique bool) []bool {
+func MineGen(params GameParams, x, y int) []bool {
 	var (
+		w       = params.Width
+		h       = params.Height
+		n       = params.MineCount
+		unique  = params.Unique
 		success bool
 		nTries  uint64
 		ret     = make([]bool, w*h)
