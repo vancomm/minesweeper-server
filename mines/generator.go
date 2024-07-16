@@ -11,7 +11,7 @@ import (
 )
 
 /* ----------------------------------------------------------------------
- * Grid generator which uses the above solver.
+ * Grid generator which uses [the above] solver.
  */
 
 type minectx struct {
@@ -52,9 +52,9 @@ func mineOpen(ctx *minectx, x, y int) (n squareInfo) {
 type curiosity int
 
 const (
-	VerySuspicious curiosity = iota + 1
-	MildlyInteresting
-	Boring
+	verySuspicious curiosity = iota + 1
+	mildlyInteresting
+	boring
 )
 
 /* Structure used internally to mineperturb(). */
@@ -164,21 +164,21 @@ func minePerturb(
 			sq := &square{x: x, y: y}
 
 			if grid[y*ctx.w+x] != Unknown {
-				sq.priority = Boring /* known square */
+				sq.priority = boring /* known square */
 			} else {
 				/*
 				 * Unknown square. Examine everything around it and
 				 * see if it borders on any known squares. If it
 				 * does, it's class 1, otherwise it's 2.
 				 */
-				sq.priority = MildlyInteresting
+				sq.priority = mildlyInteresting
 
 				for dy := -1; dy <= 1; dy++ {
 					for dx := -1; dx <= 1; dx++ {
 						if x+dx >= 0 && x+dx < ctx.w &&
 							y+dy >= 0 && y+dy < ctx.h &&
 							grid[(y+dy)*ctx.w+(x+dx)] != Unknown {
-							sq.priority = VerySuspicious
+							sq.priority = verySuspicious
 							break
 						}
 					}
@@ -206,7 +206,7 @@ func minePerturb(
 					// assert(setx+dx <= ctx->w);
 					// assert(sety+dy <= ctx->h);
 					if setx+dx > ctx.w || sety+dy > ctx.h {
-						log.WithFields(logrus.Fields{
+						Log.WithFields(logrus.Fields{
 							"dx": dx, "dy": dy, "ctx": ctx,
 						}).Fatal("out of range")
 					}
@@ -266,7 +266,7 @@ func minePerturb(
 	var setlist []int
 	if len(toFill) != nfull && len(toEmpty) != nempty {
 		if len(toEmpty) == 0 { // assert(ntoempty != 0)
-			log.WithFields(logrus.Fields{
+			Log.WithFields(logrus.Fields{
 				"toEmpty": toEmpty, "toFill": toFill,
 			}).Fatal("invalid state")
 		}
@@ -279,7 +279,7 @@ func minePerturb(
 						// assert(setx+dx <= ctx->w);
 						// assert(sety+dy <= ctx->h);
 						if setx+dx > ctx.w || sety+dy > ctx.h {
-							log.WithFields(logrus.Fields{
+							Log.WithFields(logrus.Fields{
 								"dx": dx, "dy": dy, "ctx": ctx,
 							}).Fatal("out of range")
 						}
@@ -305,7 +305,7 @@ func minePerturb(
 
 		// assert(i > ntoempty)
 		if i <= len(toEmpty) {
-			log.WithFields(logrus.Fields{
+			Log.WithFields(logrus.Fields{
 				"i": i, "toEmpty": toEmpty,
 			}).Fatal("i must be less than len(toEmpty)")
 		}
@@ -361,7 +361,7 @@ func minePerturb(
 	if setlist != nil {
 		// assert(todo == toempty)
 		if !reflect.DeepEqual(todos, toEmpty) {
-			log.WithFields(logrus.Fields{
+			Log.WithFields(logrus.Fields{
 				"todos": todos, "toEmpty": toEmpty,
 			}).Fatal("must be equal")
 		}
@@ -407,7 +407,7 @@ func minePerturb(
 
 	// assert(i == ret->n)
 	if len(perturbs) != 2*len(todos) {
-		log.WithFields(logrus.Fields{
+		Log.WithFields(logrus.Fields{
 			"todos": todos, "perturbs": perturbs,
 		}).Fatal("some perturbations have not generated")
 	}
@@ -429,7 +429,7 @@ func minePerturb(
 		 */
 		// assert((delta < 0) ^ (ctx->grid[y*ctx->w+x] == 0))
 		if (delta < 0) == (!ctx.grid[y*ctx.w+x]) {
-			log.Fatal("trying to add an existing mine or remove an absent one")
+			Log.Fatal("trying to add an existing mine or remove an absent one")
 		}
 
 		/*
@@ -562,7 +562,7 @@ func MineGen(params GameParams, x, y int) []bool {
 
 				// assert(solvegrid[y*w+x] == 0) /* by deliberate arrangement */
 				if solveGrid[y*w+x] != 0 {
-					log.WithFields(logrus.Fields{
+					Log.WithFields(logrus.Fields{
 						"solveGrid": solveGrid, "ctx": ctx,
 					}).Fatal("mine in first square")
 				}

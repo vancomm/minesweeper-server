@@ -1,3 +1,5 @@
+// source: https://git.tartarus.org/simon/puzzles.git/mines.c
+
 package mines
 
 type GameParams struct {

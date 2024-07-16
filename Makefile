@@ -7,6 +7,9 @@ run:
 	go build -o ${BINARY_NAME} *.go
 	./${BINARY_NAME}
  
+test:
+	go test -v ./...
+
 clean:
 	go clean
 	rm ${BINARY_NAME}

@@ -13,19 +13,6 @@ import (
  * solvable without having to take risks.
  */
 
-type word uint16
-
-/*
-Count the bits in a word. Only needs to cope with 16 bits.
-*/
-func (word word) bitcount() int {
-	word = ((word & 0xAAAA) >> 1) + (word & 0x5555)
-	word = ((word & 0xCCCC) >> 2) + (word & 0x3333)
-	word = ((word & 0xF0F0) >> 4) + (word & 0x0F0F)
-	word = ((word & 0xFF00) >> 8) + (word & 0x00FF)
-	return int(word)
-}
-
 /*
 We use a tree234 to store a large number of small localised
 sets, each with a mine count. We also keep some of those sets
@@ -89,7 +76,7 @@ func (ss *setstore) addTodo(s *set) {
 
 func (ss *setstore) add(x, y int, mask word, mines int) {
 	if mask == 0 { // assert mask != 0
-		log.Fatal("mask cannot be 0")
+		Log.Fatal("mask cannot be 0")
 	}
 
 	/*
@@ -323,7 +310,7 @@ func (grid *gridInfo) knownSquares(
 						(*grid)[i] = open(openctx, x+xx, y+yy) /* *bang* */
 
 						if (*grid)[i] == Mine { // assert grid[i] != -1
-							log.Fatal("boom")
+							Log.Fatal("boom")
 						}
 					}
 					std.add(i)
@@ -442,15 +429,15 @@ func MineSolve(
 		}
 
 		if s := ss.todo(); s != nil {
-			if s.mines == 0 || s.mines == s.mask.bitcount() {
+			if s.mines == 0 || s.mines == s.mask.bitCount() {
 				grid.knownSquares(w, std, open, ctx, s.x, s.y, s.mask, s.mines != 0)
 				continue
 			}
 			for _, s2 := range ss.overlap(s.x, s.y, s.mask) {
 				swing := setMunge(s.x, s.y, s.mask, s2.x, s2.y, s2.mask, true)
 				s2wing := setMunge(s2.x, s2.y, s2.mask, s.x, s.y, s.mask, true)
-				swc := swing.bitcount()
-				s2wc := s2wing.bitcount()
+				swc := swing.bitCount()
+				s2wc := s2wing.bitCount()
 
 				if (swc == s.mines-s2.mines) || (s2wc == s2.mines-s.mines) {
 					grid.knownSquares(w, std, open, ctx,
@@ -521,7 +508,7 @@ func MineSolve(
 						}
 						if ok {
 							minesleft -= sets[cursor].mines
-							squaresleft -= sets[cursor].mask.bitcount()
+							squaresleft -= sets[cursor].mask.bitCount()
 						}
 						setused[cursor] = ok
 						cursor++
@@ -559,7 +546,7 @@ func MineSolve(
 						}
 						if cursor >= 0 {
 							minesleft += sets[cursor].mines
-							squaresleft += sets[cursor].mask.bitcount()
+							squaresleft += sets[cursor].mask.bitCount()
 							setused[cursor] = false
 							cursor++
 						} else {
