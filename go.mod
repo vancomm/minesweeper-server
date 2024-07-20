@@ -2,7 +2,10 @@ module github.com/vancomm/minesweeper-server
 
 go 1.22.3
 
-require github.com/sirupsen/logrus v1.9.3
+require (
+	github.com/gorilla/schema v1.4.1
+	github.com/sirupsen/logrus v1.9.3
+)
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect

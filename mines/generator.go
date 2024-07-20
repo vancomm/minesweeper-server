@@ -16,13 +16,13 @@ import (
 
 type minectx struct {
 	grid             []bool
-	w, h             int
+	width, height    int
 	sx, sy           int
 	allowBigPerturbs bool
 }
 
 func (ctx minectx) at(x, y int) bool {
-	return ctx.grid[y*ctx.w+x]
+	return ctx.grid[y*ctx.width+x]
 }
 
 // x and y must be in range of ctx.Grid's w and h
@@ -31,11 +31,11 @@ func mineOpen(ctx *minectx, x, y int) (n squareInfo) {
 		return Mine /* *bang* */
 	}
 	for i := -1; i <= 1; i++ {
-		if x+i < 0 || x+i >= ctx.w {
+		if x+i < 0 || x+i >= ctx.width {
 			continue
 		}
 		for j := -1; j <= 1; j++ {
-			if y+j < 0 || y+j >= ctx.h {
+			if y+j < 0 || y+j >= ctx.height {
 				continue
 			}
 			if i == 0 && j == 0 {
@@ -61,7 +61,7 @@ const (
 type square struct {
 	x, y     int
 	priority curiosity
-	random   int
+	random   int32
 }
 
 func squarecmp(a, b *square) int {
@@ -120,6 +120,7 @@ func minePerturb(
 	grid gridInfo,
 	setx, sety int,
 	mask word,
+	r *rand.Rand,
 ) []*perturbation {
 	if mask == 0 && !ctx.allowBigPerturbs {
 		return nil
@@ -140,8 +141,8 @@ func minePerturb(
 	* it with a random secondary key.
 	 */
 	var squares []*square
-	for y := range ctx.h {
-		for x := range ctx.w {
+	for y := range ctx.height {
+		for x := range ctx.width {
 			/*
 			 * If this square is too near the starting position,
 			 * don't put it on the list at all.
@@ -154,7 +155,7 @@ func minePerturb(
 			 * If this square is in the input set, also don't put
 			 * it on the list!
 			 */
-			if (mask == 0 && grid[y*ctx.w+x] == Unknown) ||
+			if (mask == 0 && grid[y*ctx.width+x] == Unknown) ||
 				(x >= setx && (x < setx+3) &&
 					y >= sety && (y < sety+3) &&
 					(mask&(1<<((y-sety)*3+(x-setx)))) != 0) {
@@ -163,7 +164,7 @@ func minePerturb(
 
 			sq := &square{x: x, y: y}
 
-			if grid[y*ctx.w+x] != Unknown {
+			if grid[y*ctx.width+x] != Unknown {
 				sq.priority = boring /* known square */
 			} else {
 				/*
@@ -175,9 +176,9 @@ func minePerturb(
 
 				for dy := -1; dy <= 1; dy++ {
 					for dx := -1; dx <= 1; dx++ {
-						if x+dx >= 0 && x+dx < ctx.w &&
-							y+dy >= 0 && y+dy < ctx.h &&
-							grid[(y+dy)*ctx.w+(x+dx)] != Unknown {
+						if (x+dx >= 0) && (x+dx < ctx.width) &&
+							(y+dy >= 0) && (y+dy < ctx.height) &&
+							grid[(y+dy)*ctx.width+(x+dx)] != Unknown {
 							sq.priority = verySuspicious
 							break
 						}
@@ -188,6 +189,7 @@ func minePerturb(
 			 * Finally, a random number to cause qsort to
 			 * shuffle within each group.
 			 */
+			sq.random = r.Int32()
 			squares = append(squares, sq)
 		}
 	}
@@ -205,12 +207,12 @@ func minePerturb(
 				if mask&(1<<(dy*3+dx)) != 0 {
 					// assert(setx+dx <= ctx->w);
 					// assert(sety+dy <= ctx->h);
-					if setx+dx > ctx.w || sety+dy > ctx.h {
+					if setx+dx > ctx.width || sety+dy > ctx.height {
 						Log.WithFields(logrus.Fields{
 							"dx": dx, "dy": dy, "ctx": ctx,
 						}).Fatal("out of range")
 					}
-					if ctx.grid[(sety+dy)*ctx.w+(setx+dx)] {
+					if ctx.grid[(sety+dy)*ctx.width+(setx+dx)] {
 						nfull++
 					} else {
 						nempty++
@@ -219,9 +221,9 @@ func minePerturb(
 			}
 		}
 	} else {
-		for y := range ctx.h {
-			for x := range ctx.w {
-				if grid[y*ctx.w+x] == Unknown {
+		for y := range ctx.height {
+			for x := range ctx.width {
+				if grid[y*ctx.width+x] == Unknown {
 					nfull++
 				} else {
 					nempty++
@@ -241,7 +243,7 @@ func minePerturb(
 		toFill, toEmpty []*square
 	)
 	for _, sq := range squares {
-		if ctx.grid[sq.y*ctx.w+sq.x] {
+		if ctx.grid[sq.y*ctx.width+sq.x] {
 			toEmpty = append(toEmpty, sq)
 		} else {
 			toFill = append(toFill, sq)
@@ -270,33 +272,33 @@ func minePerturb(
 				"toEmpty": toEmpty, "toFill": toFill,
 			}).Fatal("invalid state")
 		}
-		setlist = make([]int, ctx.w*ctx.h)
-		i := 0
+
+		var setlist []int
+
 		if mask != 0 {
 			for dy := range 3 {
 				for dx := range 3 {
 					if mask&(1<<(dy*3+dx)) != 0 {
 						// assert(setx+dx <= ctx->w);
 						// assert(sety+dy <= ctx->h);
-						if setx+dx > ctx.w || sety+dy > ctx.h {
+						if setx+dx > ctx.width || sety+dy > ctx.height {
 							Log.WithFields(logrus.Fields{
 								"dx": dx, "dy": dy, "ctx": ctx,
 							}).Fatal("out of range")
 						}
-						if !ctx.grid[(sety+dy)*ctx.w+(setx+dx)] {
-							setlist[i] = (sety+dy)*ctx.w + (setx + dx)
-							i++
+
+						if !ctx.grid[(sety+dy)*ctx.width+(setx+dx)] {
+							setlist = append(setlist, (sety+dy)*ctx.width+(setx+dx))
 						}
 					}
 				}
 			}
 		} else {
-			for y := range ctx.h {
-				for x := range ctx.w {
-					if grid[y*ctx.w+x] == Unknown {
-						if !ctx.grid[y*ctx.w+x] {
-							setlist[i] = y*ctx.w + x
-							i++
+			for y := range ctx.height {
+				for x := range ctx.width {
+					if grid[y*ctx.width+x] == Unknown {
+						if !ctx.grid[y*ctx.width+x] {
+							setlist = append(setlist, y*ctx.width+x)
 						}
 					}
 				}
@@ -304,17 +306,17 @@ func minePerturb(
 		}
 
 		// assert(i > ntoempty)
-		if i <= len(toEmpty) {
+		if (len(setlist)) <= len(toEmpty) {
 			Log.WithFields(logrus.Fields{
-				"i": i, "toEmpty": toEmpty,
-			}).Fatal("i must be less than len(toEmpty)")
+				"setlist": setlist, "toEmpty": toEmpty,
+			}).Fatal("setlist cannot be smaller than toEmpty")
 		}
 
 		/*
 		 * Now pick `ntoempty' items at random from the list.
 		 */
 		for k := range toEmpty {
-			index := k + rand.IntN(i-k)
+			index := k + r.IntN(len(setlist)-k)
 			setlist[k], setlist[index] = setlist[index], setlist[k]
 		}
 	} else {
@@ -343,13 +345,16 @@ func minePerturb(
 		dTodo = MarkAsMine
 		dSet = MarkAsClear
 	} else {
+		/*
+		 * (We also fall into this case if we've constructed a
+		 * setlist.)
+		 */
 		todos = toEmpty
 		dTodo = MarkAsClear
 		dSet = MarkAsMine
 	}
 
 	var perturbs []*perturbation // originally snewn(2 * ntodo, struct perturbation)
-
 	for _, t := range todos {
 		perturbs = append(perturbs, &perturbation{
 			x:     t.x,
@@ -368,8 +373,8 @@ func minePerturb(
 
 		for j := range toEmpty {
 			perturbs = append(perturbs, &perturbation{
-				x:     setlist[j] % ctx.w,
-				y:     setlist[j] / ctx.w,
+				x:     setlist[j] % ctx.width,
+				y:     setlist[j] / ctx.width,
 				delta: dSet,
 			})
 		}
@@ -377,7 +382,7 @@ func minePerturb(
 		for dy := range 3 {
 			for dx := range 3 {
 				if mask&(1<<(dy*3+dx)) != 0 {
-					currval := iif(ctx.grid[(sety+dy)*ctx.w+(setx+dx)], MarkAsMine, MarkAsClear)
+					currval := iif(ctx.grid[(sety+dy)*ctx.width+(setx+dx)], MarkAsMine, MarkAsClear)
 					if dSet == -currval {
 						perturbs = append(perturbs, &perturbation{
 							x:     setx + dx,
@@ -389,10 +394,10 @@ func minePerturb(
 			}
 		}
 	} else {
-		for y := range ctx.h {
-			for x := range ctx.w {
-				if grid[y*ctx.w+x] == Unknown {
-					currval := iif(ctx.grid[y*ctx.w+x], MarkAsMine, MarkAsClear)
+		for y := range ctx.height {
+			for x := range ctx.width {
+				if grid[y*ctx.width+x] == Unknown {
+					currval := iif(ctx.grid[y*ctx.width+x], MarkAsMine, MarkAsClear)
 					if dSet == -currval {
 						perturbs = append(perturbs, &perturbation{
 							x:     x,
@@ -428,23 +433,23 @@ func minePerturb(
 		 * an absent one.
 		 */
 		// assert((delta < 0) ^ (ctx->grid[y*ctx->w+x] == 0))
-		if (delta < 0) == (!ctx.grid[y*ctx.w+x]) {
+		if (delta < 0) == (!ctx.grid[y*ctx.width+x]) {
 			Log.Fatal("trying to add an existing mine or remove an absent one")
 		}
 
 		/*
 		 * Actually make the change.
 		 */
-		ctx.grid[y*ctx.w+x] = (delta > 0)
+		ctx.grid[y*ctx.width+x] = (delta > 0)
 
 		/*
 		 * Update any numbers already present in the grid.
 		 */
 		for dy := -1; dy <= 1; dy++ {
 			for dx := -1; dx <= 1; dx++ {
-				if (x+dx == 0 && x+dx < ctx.w) &&
-					(y+dy >= 0 && y+dy < ctx.h) &&
-					grid[(y+dy)*ctx.w+(x+dx)] != Unknown {
+				if (x+dx == 0 && x+dx < ctx.width) &&
+					(y+dy >= 0 && y+dy < ctx.height) &&
+					grid[(y+dy)*ctx.width+(x+dx)] != Unknown {
 					if dx == 0 && dy == 0 {
 						/*
 						 * The square itself is marked as known in
@@ -452,23 +457,23 @@ func minePerturb(
 						 * mine, or else work out its number.
 						 */
 						if delta == MarkAsMine {
-							grid[y*ctx.w+x] = Mine
+							grid[y*ctx.width+x] = Mine
 						} else {
 							var minecount squareInfo
 							for dy2 := -1; dy2 <= 1; dy2++ {
 								for dx2 := -1; dx2 <= 1; dx2++ {
-									if (x+dx2 >= 0 && x+dx2 < ctx.w) &&
-										(y+dy2 >= 0 && y+dy2 < ctx.h) &&
-										ctx.grid[(y+dy2)*ctx.w+(x+dx2)] {
+									if (x+dx2 >= 0 && x+dx2 < ctx.width) &&
+										(y+dy2 >= 0 && y+dy2 < ctx.height) &&
+										ctx.grid[(y+dy2)*ctx.width+(x+dx2)] {
 										minecount++
 									}
 								}
 							}
-							grid[y*ctx.w+x] = minecount
+							grid[y*ctx.width+x] = minecount
 						}
 					} else {
-						if grid[(y+dy)*ctx.w+(x+dx)] >= 0 {
-							grid[(y+dy)*ctx.w+(x+dx)] += squareInfo(delta)
+						if grid[(y+dy)*ctx.width+(x+dx)] >= 0 {
+							grid[(y+dy)*ctx.width+(x+dx)] += squareInfo(delta)
 						}
 					}
 				}
@@ -487,19 +492,18 @@ const (
 	// values >0 mean given number of perturbations was required
 )
 
-func MineGen(params GameParams, x, y int) []bool {
+func MineGen(params GameParams, x, y int, r *rand.Rand) []bool {
 	var (
-		w       = params.Width
-		h       = params.Height
-		n       = params.MineCount
-		unique  = params.Unique
-		success bool
-		nTries  uint64
-		ret     = make([]bool, w*h)
+		width     = params.Width
+		height    = params.Height
+		mineCount = params.MineCount
+		unique    = params.Unique
+		nTries    = 0
+		ret       = make([]bool, width*height)
 	)
 
-	for !success {
-		success = false
+	// do { success = false; ... } while (!success)
+	for success := false; !success; {
 		nTries++
 
 		/*
@@ -507,15 +511,15 @@ func MineGen(params GameParams, x, y int) []bool {
 		 * one square of it.
 		 */
 		{
-			var tmp []int
+			var mineable []int
 
 			/*
 			* Write down the list of possible mine locations.
 			 */
-			for i := range h {
-				for j := range w {
+			for i := range height {
+				for j := range width {
 					if absDiff(i, y) > 1 || absDiff(j, x) > 1 {
-						tmp = append(tmp, i*w+j)
+						mineable = append(mineable, i*width+j)
 					}
 				}
 			}
@@ -523,12 +527,12 @@ func MineGen(params GameParams, x, y int) []bool {
 			/*
 			 * Now pick n off the list at random.
 			 */
-			k := len(tmp)
-			for nn := n; nn > 0; n-- {
-				i := rand.IntN(k)
-				ret[tmp[i]] = true
+			k := len(mineable)
+			for range mineCount {
+				i := r.IntN(k)
+				ret[mineable[i]] = true
 				k--
-				tmp[i] = tmp[k]
+				mineable[i] = mineable[k]
 			}
 		}
 
@@ -542,10 +546,10 @@ func MineGen(params GameParams, x, y int) []bool {
 		 */
 		if unique {
 			var (
-				solveGrid = make(gridInfo, w*h)
+				solveGrid = make(gridInfo, width*height)
 				ctx       = &minectx{
-					grid: ret,
-					w:    w, h: w,
+					grid:  ret,
+					width: width, height: height,
 					sx: x, sy: y,
 					allowBigPerturbs: nTries > 100,
 				}
@@ -558,22 +562,23 @@ func MineGen(params GameParams, x, y int) []bool {
 					solveGrid[i] = Unknown
 				}
 
-				solveGrid[y*w+x] = mineOpen(ctx, x, y)
+				solveGrid[y*width+x] = mineOpen(ctx, x, y)
 
 				// assert(solvegrid[y*w+x] == 0) /* by deliberate arrangement */
-				if solveGrid[y*w+x] != 0 {
+				if solveGrid[y*width+x] != 0 {
 					Log.WithFields(logrus.Fields{
 						"solveGrid": solveGrid, "ctx": ctx,
 					}).Fatal("mine in first square")
 				}
 
-				solveRet = MineSolve(w, h, n, solveGrid, mineOpen, minePerturb, ctx)
+				solveRet = mineSolve(width, height, mineCount, solveGrid, mineOpen, minePerturb, ctx, r)
 
 				if solveRet < 0 || prevRet >= 0 && solveRet >= prevRet {
 					success = false
 					break
-				} else if solveRet == 0 {
+				} else if solveRet == Success {
 					success = true
+					break
 				}
 			}
 		} else {

@@ -2,6 +2,8 @@
 
 package mines
 
+import "math/rand/v2"
+
 type GameParams struct {
 	Width, Height, MineCount int
 	Unique                   bool
@@ -17,19 +19,36 @@ type MineLayout struct {
 	Unique    bool
 }
 
-func NewLayout(params GameParams, x, y int) *MineLayout {
+func NewLayout(params GameParams, x, y int, r *rand.Rand) *MineLayout {
 	return &MineLayout{
-		Mines:     MineGen(params, x, y),
+		Mines:     MineGen(params, x, y, r),
 		MineCount: params.MineCount,
 		Unique:    params.Unique,
 	}
 }
 
+type squareInfo int8
+
+const (
+	Question    squareInfo = -3
+	Unknown     squareInfo = -2
+	Mine        squareInfo = -1
+	CorrectFlag squareInfo = 64
+	Exploded    squareInfo = 65
+	WrongFlag   squareInfo = 66
+	// 0-8 for empty with given number of mined neighbors
+)
+
+type (
+	gridInfo []squareInfo
+	openFunc func(*minectx, int, int) squareInfo
+)
+
 type GameState struct {
 	GameParams
 	Dead, Won, UsedSolve bool
-	Layout               MineLayout   /* real mine positions */
-	Grid                 []squareInfo /* player knowledge */
+	Layout               MineLayout /* real mine positions */
+	Grid                 gridInfo   /* player knowledge */
 	/*
 	 * Each item in the `grid' array is one of the following values:
 	 *
@@ -69,9 +88,9 @@ func (s *GameState) OpenSquare(x, y int) int {
 	return 0
 }
 
-func New(params GameParams, x, y int) *GameState {
+func New(params GameParams, x, y int, r *rand.Rand) *GameState {
 	return &GameState{
 		GameParams: params,
-		Layout:     *NewLayout(params, x, y),
+		Layout:     *NewLayout(params, x, y, r),
 	}
 }
