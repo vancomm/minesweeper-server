@@ -21,13 +21,13 @@ type minectx struct {
 	allowBigPerturbs bool
 }
 
-func (ctx minectx) at(x, y int) bool {
+func (ctx minectx) mineAt(x, y int) bool {
 	return ctx.grid[y*ctx.width+x]
 }
 
 // x and y must be in range of ctx.Grid's w and h
 func mineOpen(ctx *minectx, x, y int) (n squareInfo) {
-	if ctx.at(x, y) {
+	if ctx.mineAt(x, y) {
 		return Mine /* *bang* */
 	}
 	for i := -1; i <= 1; i++ {
@@ -41,7 +41,7 @@ func mineOpen(ctx *minectx, x, y int) (n squareInfo) {
 			if i == 0 && j == 0 {
 				continue
 			}
-			if ctx.at(x+i, y+j) {
+			if ctx.mineAt(x+i, y+j) {
 				n++
 			}
 		}
@@ -382,7 +382,12 @@ func minePerturb(
 		for dy := range 3 {
 			for dx := range 3 {
 				if mask&(1<<(dy*3+dx)) != 0 {
-					currval := iif(ctx.grid[(sety+dy)*ctx.width+(setx+dx)], MarkAsMine, MarkAsClear)
+					var currval perturbdelta
+					if ctx.mineAt(setx+dx, sety+dy) {
+						currval = MarkAsMine
+					} else {
+						currval = MarkAsClear
+					}
 					if dSet == -currval {
 						perturbs = append(perturbs, &perturbation{
 							x:     setx + dx,
@@ -397,7 +402,12 @@ func minePerturb(
 		for y := range ctx.height {
 			for x := range ctx.width {
 				if grid[y*ctx.width+x] == Unknown {
-					currval := iif(ctx.grid[y*ctx.width+x], MarkAsMine, MarkAsClear)
+					var currval perturbdelta
+					if ctx.mineAt(x, y) {
+						currval = MarkAsMine
+					} else {
+						currval = MarkAsClear
+					}
 					if dSet == -currval {
 						perturbs = append(perturbs, &perturbation{
 							x:     x,

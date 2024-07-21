@@ -447,7 +447,10 @@ func mineSolve(
 					/*
 					 * Compute the new mine count.
 					 */
-					newmines := s.mines - iif(grid[i] == Mine, 1, 0)
+					newmines := s.mines
+					if grid[i] == Mine {
+						newmines--
+					}
 
 					/*
 					 * Insert the new set into the collection,

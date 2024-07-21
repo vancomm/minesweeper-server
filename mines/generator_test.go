@@ -8,12 +8,13 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/vancomm/minesweeper-server/mines"
+	"github.com/vancomm/minesweeper-server/tree234"
 )
 
 func TestMain(m *testing.M) {
 	mines.Log.SetLevel(logrus.DebugLevel)
 	// tree234.Log.SetLevel(logrus.DebugLevel)
-	// tree234.Log.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true})
+	tree234.Log.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true})
 	m.Run()
 }
 
