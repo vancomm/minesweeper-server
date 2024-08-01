@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 	"github.com/vancomm/minesweeper-server/mines"
 	"github.com/vancomm/minesweeper-server/tree234"
 )
@@ -27,29 +28,28 @@ func TestGen(t *testing.T) {
 			MineCount: 130,
 			Unique:    true,
 		}
-		sx, sy = 14, 7
-		res    = mines.MineGen(params, sx, sy, r)
+		sx, sy   = 14, 7
+		res, err = mines.MineGen(params, sx, sy, r)
 	)
 
-	if res == nil {
-		t.Error("generation failed")
-	} else {
-		var b strings.Builder
-		fmt.Fprint(&b, "\n")
-		for y := range params.Height {
-			for x := range params.Width {
-				var ch string
-				if x == sx && y == sy {
-					ch = "S "
-				} else if res[y*params.Width+x] {
-					ch = "* "
-				} else {
-					ch = "- "
-				}
-				fmt.Fprint(&b, ch)
+	require.Nil(t, err)
+
+	var b strings.Builder
+	fmt.Fprint(&b, "\n")
+	for y := range params.Height {
+		for x := range params.Width {
+			var ch string
+			if x == sx && y == sy {
+				ch = "S "
+			} else if res[y*params.Width+x] {
+				ch = "* "
+			} else {
+				ch = "- "
 			}
-			fmt.Fprint(&b, "\n")
+			fmt.Fprint(&b, ch)
 		}
-		t.Log(b.String())
+		fmt.Fprint(&b, "\n")
 	}
+	t.Log(b.String())
+
 }

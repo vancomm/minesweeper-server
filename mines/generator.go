@@ -502,18 +502,25 @@ const (
 	// values >0 mean given number of perturbations was required
 )
 
-func MineGen(params GameParams, x, y int, r *rand.Rand) []bool {
+type MineGenError string
+
+func (mge MineGenError) Error() string {
+	return string(mge)
+}
+
+func MineGen(params GameParams, x, y int, r *rand.Rand) ([]bool, error) {
 	var (
 		width     = params.Width
 		height    = params.Height
 		mineCount = params.MineCount
 		unique    = params.Unique
 		nTries    = 0
-		ret       = make([]bool, width*height)
+		grid      = make([]bool, width*height)
 	)
 
 	// do { success = false; ... } while (!success)
-	for success := false; !success; {
+	success := false
+	for !success {
 		nTries++
 
 		/*
@@ -540,7 +547,7 @@ func MineGen(params GameParams, x, y int, r *rand.Rand) []bool {
 			k := len(mineable)
 			for range mineCount {
 				i := r.IntN(k)
-				ret[mineable[i]] = true
+				grid[mineable[i]] = true
 				k--
 				mineable[i] = mineable[k]
 			}
@@ -558,7 +565,7 @@ func MineGen(params GameParams, x, y int, r *rand.Rand) []bool {
 			var (
 				solveGrid = make(gridInfo, width*height)
 				ctx       = &minectx{
-					grid:  ret,
+					grid:  grid,
 					width: width, height: height,
 					sx: x, sy: y,
 					allowBigPerturbs: nTries > 100,
@@ -595,5 +602,11 @@ func MineGen(params GameParams, x, y int, r *rand.Rand) []bool {
 			success = true
 		}
 	}
-	return ret
+
+	var err error
+	if !success {
+		err = MineGenError("could not generate a field")
+	}
+
+	return grid, err
 }

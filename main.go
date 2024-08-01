@@ -27,7 +27,7 @@ type NewGameParams struct {
 	Unique    bool `schema:"unique,required"`
 }
 
-type ClickParams struct {
+type OpenParams struct {
 	X int `schema:"x,required"`
 	Y int `schema:"y,required"`
 }
@@ -35,7 +35,7 @@ type ClickParams struct {
 func handleNewGame(w http.ResponseWriter, h *http.Request) {
 	var (
 		gameParams  NewGameParams
-		clickParams ClickParams
+		clickParams OpenParams
 		query       = h.URL.Query()
 	)
 
@@ -54,11 +54,16 @@ func handleNewGame(w http.ResponseWriter, h *http.Request) {
 		"clickParams": clickParams,
 	}).Info("new game request")
 
-	grid := mines.MineGen(
+	grid, err := mines.MineGen(
 		mines.GameParams(gameParams),
 		clickParams.X, clickParams.Y,
 		r,
 	)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
 
 	j, err := json.Marshal(grid)
 	if err != nil {
@@ -69,7 +74,7 @@ func handleNewGame(w http.ResponseWriter, h *http.Request) {
 	w.Write(j)
 }
 
-func handleClick(w http.ResponseWriter, r *http.Request) {
+func handleOpen(w http.ResponseWriter, r *http.Request) {
 
 }
 
@@ -77,7 +82,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /newgame", handleNewGame)
-	mux.HandleFunc("GET /click", handleClick)
+	mux.HandleFunc("GET /open", handleOpen)
 
 	log.Fatal(http.ListenAndServe("localhost:8000", mux))
 }
