@@ -3,11 +3,12 @@
 package mines
 
 import (
-	"fmt"
 	"math/rand/v2"
-	"strconv"
-	"strings"
+
+	"github.com/sirupsen/logrus"
 )
+
+var Log = logrus.New()
 
 type GameParams struct {
 	Width, Height, MineCount int
@@ -20,8 +21,8 @@ type MineLayout struct {
 	 * If we haven't yet actually generated the mine layout, here's
 	 * all the data we will need to do so.
 	 */
-	MineCount int
-	Unique    bool
+	mineCount int
+	unique    bool
 }
 
 func NewLayout(params GameParams, x, y int, r *rand.Rand) (*MineLayout, error) {
@@ -32,57 +33,11 @@ func NewLayout(params GameParams, x, y int, r *rand.Rand) (*MineLayout, error) {
 	if err == nil {
 		layout = &MineLayout{
 			MineGrid:  grid,
-			MineCount: params.MineCount,
-			Unique:    params.Unique,
+			mineCount: params.MineCount,
+			unique:    params.Unique,
 		}
 	}
 	return layout, err
-}
-
-type squareInfo int8
-
-const (
-	Todo        squareInfo = -10 // internal
-	Question    squareInfo = -3  // ui
-	Unknown     squareInfo = -2
-	Mine        squareInfo = -1
-	CorrectFlag squareInfo = 64 // post-game-over
-	Exploded    squareInfo = 65
-	WrongFlag   squareInfo = 66
-	// 0-8 for empty with given number of mined neighbors
-)
-
-func (s squareInfo) String() string {
-	switch s {
-	case Question:
-		return "?"
-	case Unknown:
-		return "-"
-	case Mine:
-		return "*"
-	case 0, 1, 2, 3, 4, 5, 6, 7, 8:
-		return strconv.Itoa(int(s))
-	default:
-		return " "
-	}
-}
-
-type gridInfo []squareInfo
-
-func (g gridInfo) ToString(width int) string {
-	var b strings.Builder
-	for y := range len(g) / width {
-		for x := range width {
-			i := y*width + x
-			if i >= len(g) {
-				break
-			}
-			fmt.Fprint(&b, g[i].String()+" ")
-		}
-		fmt.Fprint(&b, "\n")
-
-	}
-	return b.String()
 }
 
 type GameState struct {

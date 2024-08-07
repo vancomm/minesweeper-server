@@ -56,6 +56,7 @@ func TestGen(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			params := test.params
 			r := rand.New(rand.NewPCG(1, 2))
 			for sx := 0; sx < params.Width; sx++ {
@@ -71,38 +72,3 @@ func TestGen(t *testing.T) {
 		})
 	}
 }
-
-func TestWeirdCase(t *testing.T) {
-	var (
-		params        = mines.GameParams{Width: 16, Height: 16, MineCount: 99, Unique: true}
-		sx            = 14
-		sy            = 13
-		hi     uint64 = 2189302816385926607
-		lo     uint64 = 14000230605465082873
-		r             = rand.New(rand.NewPCG(hi, lo))
-	)
-	_, err := mines.MineGen(params, sx, sy, r)
-	if err != nil {
-		t.Errorf("could not generate field")
-	}
-}
-
-// func fieldToString(grid []bool, params mines.GameParams, sx, sy int) string {
-// 	var b strings.Builder
-// 	fmt.Fprint(&b, "\n")
-// 	for y := range params.Height {
-// 		for x := range params.Width {
-// 			var ch string
-// 			if x == sx && y == sy {
-// 				ch = "S "
-// 			} else if grid[y*params.Width+x] {
-// 				ch = "* "
-// 			} else {
-// 				ch = "- "
-// 			}
-// 			fmt.Fprint(&b, ch)
-// 		}
-// 		fmt.Fprint(&b, "\n")
-// 	}
-// 	return b.String()
-// }

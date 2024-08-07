@@ -3,6 +3,7 @@
 package mines
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"strconv"
 
@@ -13,16 +14,16 @@ import (
  * Grid generator which uses the [above] solver.
  */
 
-type SolveResult int8
+type solveResult int8
 
 const (
-	NA SolveResult = iota - 2
+	NA solveResult = iota - 2
 	Stalled
 	Success
 	// values >0 mean given number of perturbations was required
 )
 
-func (r SolveResult) String() string {
+func (r solveResult) String() string {
 	switch r {
 	case NA:
 		return "NA"
@@ -33,12 +34,6 @@ func (r SolveResult) String() string {
 	default:
 		return strconv.Itoa(int(r)) + " perturbs"
 	}
-}
-
-type MineGenError string
-
-func (mge MineGenError) Error() string {
-	return string(mge)
 }
 
 func MineGen(params GameParams, x, y int, r *rand.Rand) ([]bool, error) {
@@ -53,7 +48,6 @@ func MineGen(params GameParams, x, y int, r *rand.Rand) ([]bool, error) {
 	// do { success = false; ... } while (!success)
 	success := false
 	for !success {
-		success = false
 		nTries++
 		grid = make([]bool, w*h)
 
@@ -98,7 +92,7 @@ func MineGen(params GameParams, x, y int, r *rand.Rand) ([]bool, error) {
 		if params.Unique {
 			var (
 				solveGrid = make(gridInfo, 0, w*h)
-				ctx       = &minectx{
+				ctx       = &mineCtx{
 					grid:  grid,
 					width: w, height: h,
 					sx: x, sy: y,
@@ -114,7 +108,6 @@ func MineGen(params GameParams, x, y int, r *rand.Rand) ([]bool, error) {
 
 				solveGrid[y*w+x] = ctx.Open(x, y)
 
-				// assert(solvegrid[y*w+x] == 0) /* by deliberate arrangement */
 				if solveGrid[y*w+x] != 0 {
 					Log.WithFields(logrus.Fields{
 						"solveGrid": solveGrid, "ctx": ctx,
@@ -122,7 +115,6 @@ func MineGen(params GameParams, x, y int, r *rand.Rand) ([]bool, error) {
 				}
 
 				solveRet := mineSolve(w, h, mineCount, solveGrid, ctx, r)
-				// fmt.Printf("solve over: %s\n", solveRet.String())
 				if solveRet < 0 || prevRet >= 0 && solveRet >= prevRet {
 					success = false
 					break
@@ -138,7 +130,7 @@ func MineGen(params GameParams, x, y int, r *rand.Rand) ([]bool, error) {
 
 	var err error
 	if !success {
-		err = MineGenError("could not generate a field")
+		err = fmt.Errorf("could not generate a field")
 	}
 
 	return grid, err

@@ -127,7 +127,7 @@ less dense than one might like. Therefore, to improve overall
 grid quality I disable this feature for the first few attempts,
 and fall back to it after no useful grid has been generated.
 */
-func (ctx *minectx) Perturb(
+func (ctx *mineCtx) Perturb(
 	grid *gridInfo,
 	setx, sety int,
 	mask word,
@@ -136,9 +136,6 @@ func (ctx *minectx) Perturb(
 	if mask == 0 && !ctx.allowBigPerturbs {
 		return nil
 	}
-
-	// fmt.Printf("setx: %d, setx: %d, mask: %d, mines: %d, grid before perturb:%s\n",
-	// 	setx, sety, mask, ctx.Mines(), ctx.PrintGrid())
 
 	/*
 	* Make a list of all the squares in the grid which we can
@@ -227,7 +224,7 @@ func (ctx *minectx) Perturb(
 							"dx": dx, "dy": dy, "ctx": ctx,
 						}).Fatal("out of range")
 					}
-					if ctx.mineAt(setx+dx, sety+dy) {
+					if ctx.MineAt(setx+dx, sety+dy) {
 						nfull++
 					} else {
 						nempty++
@@ -239,7 +236,7 @@ func (ctx *minectx) Perturb(
 		for y := range ctx.height {
 			for x := range ctx.width {
 				if (*grid)[y*ctx.width+x] == Unknown {
-					if ctx.mineAt(x, y) {
+					if ctx.MineAt(x, y) {
 						nfull++
 					} else {
 						nempty++
@@ -265,7 +262,7 @@ func (ctx *minectx) Perturb(
 		toEmpty = make([]*square, 0, ctx.width*ctx.height)
 	}
 	for _, sq := range squares {
-		if ctx.mineAt(sq.x, sq.y) {
+		if ctx.MineAt(sq.x, sq.y) {
 			toEmpty = append(toEmpty, sq)
 		} else {
 			toFill = append(toFill, sq)
@@ -291,9 +288,6 @@ func (ctx *minectx) Perturb(
 
 	if len(toFill) != nfull && len(toEmpty) != nempty {
 		if len(toEmpty) == 0 { // assert(ntoempty != 0)
-			fmt.Printf("%d:\n%s\n", ctx.Mines(), ctx.PrintGrid())
-			fmt.Printf("%s", grid.ToString(ctx.width))
-
 			Log.WithFields(logrus.Fields{
 				"toEmpty": toEmpty, "toFill": toFill,
 			}).Fatal("invalid state")
@@ -312,7 +306,7 @@ func (ctx *minectx) Perturb(
 								"dx": dx, "dy": dy, "ctx": ctx,
 							}).Fatal("out of range")
 						}
-						if !ctx.mineAt(setx+dx, sety+dy) {
+						if !ctx.MineAt(setx+dx, sety+dy) {
 							setlist = append(setlist, (sety+dy)*ctx.width+(setx+dx))
 						}
 					}
@@ -322,7 +316,7 @@ func (ctx *minectx) Perturb(
 			for y := range ctx.height {
 				for x := range ctx.width {
 					if (*grid)[y*ctx.width+x] == Unknown {
-						if !ctx.mineAt(x, y) {
+						if !ctx.MineAt(x, y) {
 							setlist = append(setlist, y*ctx.width+x)
 						}
 					}
@@ -332,17 +326,10 @@ func (ctx *minectx) Perturb(
 
 		// assert(i > ntoempty)
 		if (len(setlist)) <= len(toEmpty) {
-			// fmt.Print(ctx.PrintGrid())
-			// fmt.Print(grid.ToString(ctx.width))
 			Log.WithFields(logrus.Fields{
 				"setlist": setlist,
 				"toEmpty": toEmpty,
 				"toFill":  toFill,
-				"mask":    mask,
-				"squares": squares,
-				"nempty":  nempty,
-				"nfull":   nfull,
-				"ctx":     ctx,
 			}).Fatal("setlist cannot be smaller than toEmpty")
 		}
 
@@ -419,7 +406,7 @@ func (ctx *minectx) Perturb(
 			for dx := range 3 {
 				if mask&(1<<(dy*3+dx)) != 0 {
 					var currval delta
-					if ctx.mineAt(setx+dx, sety+dy) {
+					if ctx.MineAt(setx+dx, sety+dy) {
 						currval = SetMine
 					} else {
 						currval = SetClear
@@ -439,7 +426,7 @@ func (ctx *minectx) Perturb(
 			for x := range ctx.width {
 				if (*grid)[y*ctx.width+x] == Unknown {
 					var currval delta
-					if ctx.mineAt(x, y) {
+					if ctx.MineAt(x, y) {
 						currval = SetMine
 					} else {
 						currval = SetClear
@@ -482,10 +469,10 @@ func (ctx *minectx) Perturb(
 		 * an absent one.
 		 */
 		// assert((delta < 0) ^ (ctx->grid[y*ctx->w+x] == 0))
-		if delta.Mine() == ctx.mineAt(x, y) {
+		if delta.Mine() == ctx.MineAt(x, y) {
 			Log.WithFields(logrus.Fields{
 				"change": c,
-				"mine":   ctx.mineAt(x, y),
+				"mine":   ctx.MineAt(x, y),
 			}).Fatal("trying to add an existing mine or remove an absent one")
 		}
 
@@ -516,7 +503,7 @@ func (ctx *minectx) Perturb(
 								for dx2 := -1; dx2 <= +1; dx2++ {
 									if x+dx2 >= 0 && x+dx2 < ctx.width &&
 										y+dy2 >= 0 && y+dy2 < ctx.height &&
-										ctx.mineAt(x+dx2, y+dy2) {
+										ctx.MineAt(x+dx2, y+dy2) {
 										minecount++
 									}
 								}
@@ -532,9 +519,6 @@ func (ctx *minectx) Perturb(
 			}
 		}
 	}
-
-	// fmt.Printf("mines: %d, grid after perturb:%s\n",
-	// 	ctx.Mines(), ctx.PrintGrid())
 
 	return changes
 }
