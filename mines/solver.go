@@ -281,7 +281,7 @@ func (std *squaretodo) add(i int) {
 func (grid *gridInfo) knownSquares(
 	w int,
 	std *squaretodo,
-	open openFunc, openctx *minectx,
+	ctx *minectx,
 	x, y int, mask word, mine bool,
 ) {
 	var bit word = 1
@@ -299,7 +299,7 @@ func (grid *gridInfo) knownSquares(
 					if mine {
 						(*grid)[i] = Mine /* and don't open it! */
 					} else {
-						(*grid)[i] = open(openctx, x+xx, y+yy)
+						(*grid)[i] = ctx.Open(x+xx, y+yy)
 
 						if (*grid)[i] == Mine { // assert grid[i] != -1
 							Log.Fatal("bang") /* *bang* */
@@ -312,28 +312,6 @@ func (grid *gridInfo) knownSquares(
 		}
 	}
 }
-
-type perturbdelta int8
-
-const (
-	MarkAsMine  perturbdelta = 1
-	MarkAsClear perturbdelta = -1
-)
-
-/*
-This is data returned from the `perturb' function. It details
-which squares have become mines and which have become clear. The
-solver is (of course) expected to honourably not use that
-knowledge directly, but to efficently adjust its internal data
-structures and proceed based on only the information it
-legitimately has.
-*/
-type perturbation struct {
-	x, y  int
-	delta perturbdelta /* +1 == become a mine; -1 == cleared */
-}
-
-type perturbcb func(ctx *minectx, grid gridInfo, setx, sety int, mask word, r *rand.Rand) []*perturbation
 
 /*
 Main solver entry point. You give it a grid of existing
@@ -354,23 +332,21 @@ Return value is:
 func mineSolve(
 	w, h, n int,
 	grid gridInfo,
-	open openFunc,
-	perturb perturbcb,
 	ctx *minectx,
 	r *rand.Rand,
 ) SolveResult {
-	var (
-		ss        = NewSetStore()
-		std       = &squaretodo{}
-		nperturbs = 0
-	)
+	ss := NewSetStore()
+	nperturbs := 0
 
 	/*
 	 * Set up a linked list of squares with known contents, so that
 	 * we can process them one by one.
 	 */
-	std.next = make([]int, w*h)
-	std.head, std.tail = -1, -1
+	std := &squaretodo{
+		next: make([]int, w*h),
+		head: -1,
+		tail: -1,
+	}
 
 	/*
 	 * Initialise that list with all known squares in the input
@@ -402,7 +378,8 @@ func mineSolve(
 				std.tail = -1
 			}
 
-			x, y := i%w, i/w
+			x := i % w
+			y := i / w
 
 			if mines := grid[i]; mines >= 0 {
 				/*
@@ -489,7 +466,7 @@ func mineSolve(
 				 * If so, we can immediately mark all the squares
 				 * in the set as known.
 				 */
-				grid.knownSquares(w, std, open, ctx, s.x, s.y, s.mask, s.mines != 0)
+				grid.knownSquares(w, std, ctx, s.x, s.y, s.mask, s.mines != 0)
 
 				/*
 				 * Having done that, we need do nothing further
@@ -530,10 +507,10 @@ func mineSolve(
 				 * every square in the other wing as known clear.
 				 */
 				if (swc == s.mines-s2.mines) || (s2wc == s2.mines-s.mines) {
-					grid.knownSquares(w, std, open, ctx,
+					grid.knownSquares(w, std, ctx,
 						s.x, s.y, swing,
 						(swc == s.mines-s2.mines))
-					grid.knownSquares(w, std, open, ctx,
+					grid.knownSquares(w, std, ctx,
 						s2.x, s2.y, s2wing,
 						(s2wc == s2.mines-s.mines))
 					continue
@@ -607,7 +584,7 @@ func mineSolve(
 			if minesleft == 0 || minesleft == squaresleft {
 				for i := range w * h {
 					if grid[i] == Unknown {
-						grid.knownSquares(w, std, open, ctx,
+						grid.knownSquares(w, std, ctx,
 							i%w, i/w, 1, minesleft != 0)
 					}
 				}
@@ -744,7 +721,7 @@ func mineSolve(
 									}
 									if outside {
 										grid.knownSquares(
-											w, std, open, ctx,
+											w, std, ctx,
 											x, y, 1, minesleft != 0,
 										)
 									}
@@ -800,7 +777,7 @@ func mineSolve(
 		 * make it easier.
 		 */
 		nperturbs++
-		var ret []*perturbation
+		var changes []*change
 
 		/*
 		 * Choose a set at random from the current selection,
@@ -810,12 +787,12 @@ func mineSolve(
 		 * If we have no sets at all, we must give up.
 		 */
 		if c := ss.sets.Count(); c == 0 {
-			ret = perturb(ctx, grid, 0, 0, 0, r)
+			changes = ctx.Perturb(&grid, 0, 0, 0, r)
 		} else {
 			s := ss.sets.Index(r.IntN(c))
-			ret = perturb(ctx, grid, s.x, s.y, s.mask, r)
+			changes = ctx.Perturb(&grid, s.x, s.y, s.mask, r)
 		}
-		if len(ret) > 0 {
+		if len(changes) > 0 {
 			/*
 			 * A number of squares have been fiddled with, and
 			 * the returned structure tells us which. Adjust
@@ -825,15 +802,15 @@ func mineSolve(
 			 * known non-mine, put it back on the squares-to-do
 			 * list.
 			 */
-			for _, p := range ret {
-				if p.delta < 0 && grid[p.y*w+p.x] != Unknown {
-					std.add(p.y*w + p.x)
+			for _, c := range changes {
+				if c.delta < 0 && grid[c.y*w+c.x] != Unknown {
+					std.add(c.y*w + c.x)
 				}
 
-				list := ss.overlap(p.x, p.y, 1)
+				list := ss.overlap(c.x, c.y, 1)
 
 				for _, s := range list {
-					s.mines += int(p.delta)
+					s.mines += int(c.delta)
 					ss.addTodo(s)
 				}
 			}

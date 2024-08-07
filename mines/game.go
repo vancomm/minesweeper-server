@@ -2,7 +2,12 @@
 
 package mines
 
-import "math/rand/v2"
+import (
+	"fmt"
+	"math/rand/v2"
+	"strconv"
+	"strings"
+)
 
 type GameParams struct {
 	Width, Height, MineCount int
@@ -47,10 +52,38 @@ const (
 	// 0-8 for empty with given number of mined neighbors
 )
 
-type (
-	gridInfo []squareInfo
-	openFunc func(*minectx, int, int) squareInfo
-)
+func (s squareInfo) String() string {
+	switch s {
+	case Question:
+		return "?"
+	case Unknown:
+		return "-"
+	case Mine:
+		return "*"
+	case 0, 1, 2, 3, 4, 5, 6, 7, 8:
+		return strconv.Itoa(int(s))
+	default:
+		return " "
+	}
+}
+
+type gridInfo []squareInfo
+
+func (g gridInfo) ToString(width int) string {
+	var b strings.Builder
+	for y := range len(g) / width {
+		for x := range width {
+			i := y*width + x
+			if i >= len(g) {
+				break
+			}
+			fmt.Fprint(&b, g[i].String()+" ")
+		}
+		fmt.Fprint(&b, "\n")
+
+	}
+	return b.String()
+}
 
 type GameState struct {
 	GameParams

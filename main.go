@@ -61,7 +61,10 @@ func handleNewGame(w http.ResponseWriter, h *http.Request) {
 	)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		_, err := w.Write([]byte(err.Error()))
+		if err != nil {
+			log.Error(err)
+		}
 		return
 	}
 
@@ -71,7 +74,10 @@ func handleNewGame(w http.ResponseWriter, h *http.Request) {
 		return
 	}
 
-	w.Write(j)
+	_, err = w.Write(j)
+	if err != nil {
+		log.Error(err)
+	}
 }
 
 func handleOpen(w http.ResponseWriter, r *http.Request) {
