@@ -128,7 +128,7 @@ grid quality I disable this feature for the first few attempts,
 and fall back to it after no useful grid has been generated.
 */
 func (ctx *mineCtx) Perturb(
-	grid *gridInfo,
+	grid *GridInfo,
 	setx, sety int,
 	mask word,
 	r *rand.Rand,
@@ -498,7 +498,7 @@ func (ctx *mineCtx) Perturb(
 						if delta == SetMine {
 							(*grid)[y*ctx.width+x] = Mine
 						} else {
-							var minecount squareInfo = 0
+							var minecount SquareInfo = 0
 							for dy2 := -1; dy2 <= +1; dy2++ {
 								for dx2 := -1; dx2 <= +1; dx2++ {
 									if x+dx2 >= 0 && x+dx2 < ctx.width &&
@@ -512,7 +512,7 @@ func (ctx *mineCtx) Perturb(
 						}
 					} else {
 						if (*grid)[(y+dy)*ctx.width+(x+dx)] >= 0 {
-							(*grid)[(y+dy)*ctx.width+(x+dx)] += squareInfo(delta)
+							(*grid)[(y+dy)*ctx.width+(x+dx)] += SquareInfo(delta)
 						}
 					}
 				}

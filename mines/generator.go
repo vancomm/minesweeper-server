@@ -5,7 +5,6 @@ package mines
 import (
 	"fmt"
 	"math/rand/v2"
-	"strconv"
 
 	"github.com/sirupsen/logrus"
 )
@@ -14,29 +13,12 @@ import (
  * Grid generator which uses the [above] solver.
  */
 
-type solveResult int8
-
-const (
-	NA solveResult = iota - 2
-	Stalled
-	Success
-	// values >0 mean given number of perturbations was required
-)
-
-func (r solveResult) String() string {
-	switch r {
-	case NA:
-		return "NA"
-	case Stalled:
-		return "stalled"
-	case Success:
-		return "success"
-	default:
-		return strconv.Itoa(int(r)) + " perturbs"
-	}
+type GameParams struct {
+	Width, Height, MineCount int
+	Unique                   bool
 }
 
-func MineGen(params GameParams, x, y int, r *rand.Rand) ([]bool, error) {
+func (params GameParams) generate(x, y int, r *rand.Rand) ([]bool, error) {
 	var (
 		w         = params.Width
 		h         = params.Height
@@ -91,7 +73,7 @@ func MineGen(params GameParams, x, y int, r *rand.Rand) ([]bool, error) {
 		 */
 		if params.Unique {
 			var (
-				solveGrid = make(gridInfo, 0, w*h)
+				solveGrid = make(GridInfo, 0, w*h)
 				ctx       = &mineCtx{
 					grid:  grid,
 					width: w, height: h,

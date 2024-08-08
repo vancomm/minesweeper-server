@@ -21,20 +21,20 @@ func (std *squaretodo) add(i int) {
 	std.next[i] = -1
 }
 
-type squareInfo int8
+type SquareInfo int8
 
 const (
-	Todo        squareInfo = -10 // internal
-	Question    squareInfo = -3  // ui
-	Unknown     squareInfo = -2
-	Mine        squareInfo = -1
-	CorrectFlag squareInfo = 64 // post-game-over
-	Exploded    squareInfo = 65
-	WrongFlag   squareInfo = 66
+	Todo        SquareInfo = -10 // internal
+	Question    SquareInfo = -3  // ui
+	Unknown     SquareInfo = -2
+	Mine        SquareInfo = -1
+	CorrectFlag SquareInfo = 64 // post-game-over
+	Exploded    SquareInfo = 65
+	WrongFlag   SquareInfo = 66
 	// 0-8 for empty with given number of mined neighbors
 )
 
-func (s squareInfo) String() string {
+func (s SquareInfo) String() string {
 	switch s {
 	case Question:
 		return "?"
@@ -49,9 +49,9 @@ func (s squareInfo) String() string {
 	}
 }
 
-type gridInfo []squareInfo
+type GridInfo []SquareInfo
 
-func (g gridInfo) ToString(width int) string {
+func (g GridInfo) ToString(width int) string {
 	var b strings.Builder
 	for y := range len(g) / width {
 		for x := range width {
@@ -67,7 +67,7 @@ func (g gridInfo) ToString(width int) string {
 	return b.String()
 }
 
-func (grid *gridInfo) knownSquares(
+func (grid *GridInfo) knownSquares(
 	w int,
 	std *squaretodo,
 	ctx *mineCtx,
@@ -122,7 +122,7 @@ func (ctx *mineCtx) Mines() (count int) {
 	return
 }
 
-func (ctx *mineCtx) Open(x, y int) squareInfo {
+func (ctx *mineCtx) Open(x, y int) SquareInfo {
 	if ctx.MineAt(x, y) {
 		return Mine /* *bang* */
 	}
@@ -143,7 +143,7 @@ func (ctx *mineCtx) Open(x, y int) squareInfo {
 			}
 		}
 	}
-	return squareInfo(n)
+	return SquareInfo(n)
 }
 
 func (ctx *mineCtx) PrintGrid() string {

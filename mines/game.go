@@ -3,6 +3,7 @@
 package mines
 
 import (
+	"log"
 	"math/rand/v2"
 
 	"github.com/sirupsen/logrus"
@@ -10,41 +11,11 @@ import (
 
 var Log = logrus.New()
 
-type GameParams struct {
-	Width, Height, MineCount int
-	Unique                   bool
-}
-
-type MineLayout struct {
-	MineGrid []bool
-	/*
-	 * If we haven't yet actually generated the mine layout, here's
-	 * all the data we will need to do so.
-	 */
-	mineCount int
-	unique    bool
-}
-
-func NewLayout(params GameParams, x, y int, r *rand.Rand) (*MineLayout, error) {
-	var (
-		layout    *MineLayout
-		grid, err = MineGen(params, x, y, r)
-	)
-	if err == nil {
-		layout = &MineLayout{
-			MineGrid:  grid,
-			mineCount: params.MineCount,
-			unique:    params.Unique,
-		}
-	}
-	return layout, err
-}
-
 type GameState struct {
 	GameParams
 	Dead, Won, UsedSolve bool
-	Layout               MineLayout /* real mine positions */
-	Grid                 gridInfo   /* player knowledge */
+	Grid                 []bool   /* real mine positions */
+	PlayerGrid           GridInfo /* player knowledge */
 	/*
 	 * Each item in the `grid' array is one of the following values:
 	 *
@@ -69,23 +40,46 @@ type GameState struct {
 	 */
 }
 
-func (s *GameState) OpenSquare(x, y int) int {
+func New(params GameParams, x, y int, r *rand.Rand) (*GameState, error) {
+	grid, err := params.generate(x, y, r)
+	if err != nil {
+		return nil, err
+	}
+	playerGrid := make(GridInfo, len(grid))
+	for i := range playerGrid {
+		playerGrid[i] = Unknown
+	}
+	state := &GameState{
+		GameParams: params,
+		Grid:       grid,
+		PlayerGrid: playerGrid,
+	}
+	if state.OpenSquare(x, y) != 0 {
+		log.Fatalf("mine in or around starting square")
+	}
+	return state, err
+}
+
+func (s *GameState) OpenSquare(x, y int) (res int) {
+	Log.Debugf("opening square %d:%d", x, y)
+	defer func() { Log.Debugf("result: %d", res) }()
+
 	i := y*s.Width + x
-	if s.Layout.MineGrid[i] {
+	if s.Grid[i] {
 		/*
 		 * The player has landed on a mine. Bad luck. Expose the
 		 * mine that killed them, but not the rest (in case they
 		 * want to Undo and carry on playing).
 		 */
 		s.Dead = true
-		s.Grid[i] = Exploded
+		s.PlayerGrid[i] = Exploded
 		return -1
 	}
 
 	/*
 	 * Otherwise, the player has opened a safe square. Mark it to-do.
 	 */
-	s.Grid[y*s.Width+x] = Todo /* `todo' value internal to this func */
+	s.PlayerGrid[i] = Todo /* `todo' value internal to this func */
 
 	/*
 	 * Now go through the grid finding all `todo' values and
@@ -100,7 +94,7 @@ func (s *GameState) OpenSquare(x, y int) int {
 		doneSomething := false
 		for yy := range s.Height {
 			for xx := range s.Width {
-				if s.Grid[yy*s.Width+xx] == Todo {
+				if s.PlayerGrid[yy*s.Width+xx] == Todo {
 					v := 0
 					for dx := -1; dx <= 1; dx++ {
 						for dy := -1; dy <= 1; dy++ {
@@ -108,13 +102,13 @@ func (s *GameState) OpenSquare(x, y int) int {
 							yyy := yy + dy
 							if xxx >= 0 && xxx < s.Width &&
 								yyy >= 0 && yyy < s.Height &&
-								s.Layout.MineGrid[yyy*s.Width+xxx] {
+								s.Grid[yyy*s.Width+xxx] {
 								v++
 							}
 						}
 					}
 
-					s.Grid[yy*s.Width+xx] = squareInfo(v)
+					s.PlayerGrid[yy*s.Width+xx] = SquareInfo(v)
 
 					if v == 0 {
 						for dx := -1; dx <= 1; dx++ {
@@ -123,8 +117,8 @@ func (s *GameState) OpenSquare(x, y int) int {
 								yyy := yy + dy
 								if xxx >= 0 && xxx < s.Width &&
 									yyy >= 0 && yyy < s.Height &&
-									s.Grid[yyy*s.Width+xxx] == Unknown {
-									s.Grid[yyy*s.Width+xxx] = Todo
+									s.PlayerGrid[yyy*s.Width+xxx] == Unknown {
+									s.PlayerGrid[yyy*s.Width+xxx] = Todo
 								}
 							}
 						}
@@ -153,10 +147,10 @@ func (s *GameState) OpenSquare(x, y int) int {
 	var nmines, ncovered int
 	for yy := range s.Height {
 		for xx := range s.Width {
-			if s.Grid[yy*s.Width+xx] < 0 {
+			if s.PlayerGrid[yy*s.Width+xx] < 0 {
 				ncovered++
 			}
-			if s.Layout.MineGrid[yy*s.Width+xx] {
+			if s.Grid[yy*s.Width+xx] {
 				nmines++
 			}
 		}
@@ -165,8 +159,8 @@ func (s *GameState) OpenSquare(x, y int) int {
 	if ncovered == nmines {
 		for yy := range s.Height {
 			for xx := range s.Width {
-				if s.Grid[yy*s.Width+xx] < 0 {
-					s.Grid[yy*s.Width+xx] = Mine
+				if s.PlayerGrid[yy*s.Width+xx] < 0 {
+					s.PlayerGrid[yy*s.Width+xx] = Mine
 				}
 			}
 		}
@@ -174,16 +168,4 @@ func (s *GameState) OpenSquare(x, y int) int {
 	}
 
 	return 0
-}
-
-func New(params GameParams, x, y int, r *rand.Rand) (*GameState, error) {
-	layout, err := NewLayout(params, x, y, r)
-	if err != nil {
-		return nil, err
-	}
-	state := &GameState{
-		GameParams: params,
-		Layout:     *layout,
-	}
-	return state, err
 }

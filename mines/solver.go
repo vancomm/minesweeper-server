@@ -4,12 +4,35 @@ package mines
 
 import (
 	"math/rand/v2"
+	"strconv"
 )
 
 /* ----------------------------------------------------------------------
  * Minesweeper solver, used to ensure the generated grids are
  * solvable without having to take risks.
  */
+
+type solveResult int8
+
+const (
+	NA solveResult = iota - 2
+	Stalled
+	Success
+	// values >0 mean given number of perturbations was required
+)
+
+func (r solveResult) String() string {
+	switch r {
+	case NA:
+		return "NA"
+	case Stalled:
+		return "stalled"
+	case Success:
+		return "success"
+	default:
+		return strconv.Itoa(int(r)) + " perturbs"
+	}
+}
 
 /*
 Main solver entry point. You give it a grid of existing
@@ -29,7 +52,7 @@ Return value is:
 */
 func mineSolve(
 	w, h, n int,
-	grid gridInfo,
+	grid GridInfo,
 	ctx *mineCtx,
 	r *rand.Rand,
 ) solveResult {

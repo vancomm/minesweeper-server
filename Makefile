@@ -1,3 +1,4 @@
+CGO_ENABLED=1
 BINARY_NAME=bin/main.out
  
 build:

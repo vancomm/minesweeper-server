@@ -1,17 +1,16 @@
-package mines_test
+package mines
 
 import (
 	"math/rand/v2"
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	"github.com/vancomm/minesweeper-server/mines"
 	"github.com/vancomm/minesweeper-server/tree234"
 )
 
 func TestMain(m *testing.M) {
-	// mines.Log.SetLevel(logrus.DebugLevel)
-	mines.Log.SetFormatter(&logrus.TextFormatter{
+	// Log.SetLevel(logrus.DebugLevel)
+	Log.SetFormatter(&logrus.TextFormatter{
 		DisableTimestamp: true,
 	})
 	// tree234.Log.SetLevel(logrus.DebugLevel)
@@ -26,31 +25,31 @@ func TestGen(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		params mines.GameParams
+		params GameParams
 	}{
 		{
 			name:   "9x9(10)",
-			params: mines.GameParams{Width: 9, Height: 9, MineCount: 10, Unique: true},
+			params: GameParams{Width: 9, Height: 9, MineCount: 10, Unique: true},
 		},
 		{
 			name:   "9x9(35)",
-			params: mines.GameParams{Width: 9, Height: 9, MineCount: 35, Unique: true},
+			params: GameParams{Width: 9, Height: 9, MineCount: 35, Unique: true},
 		},
 		{
 			name:   "16x16(40)",
-			params: mines.GameParams{Width: 16, Height: 16, MineCount: 40, Unique: true},
+			params: GameParams{Width: 16, Height: 16, MineCount: 40, Unique: true},
 		},
 		{
 			name:   "16x16(99)",
-			params: mines.GameParams{Width: 16, Height: 16, MineCount: 99, Unique: true},
+			params: GameParams{Width: 16, Height: 16, MineCount: 99, Unique: true},
 		},
 		{
 			name:   "30x16(99)",
-			params: mines.GameParams{Width: 30, Height: 16, MineCount: 99, Unique: true},
+			params: GameParams{Width: 30, Height: 16, MineCount: 99, Unique: true},
 		},
 		{
 			name:   "30x16(170)",
-			params: mines.GameParams{Width: 30, Height: 16, MineCount: 170, Unique: true},
+			params: GameParams{Width: 30, Height: 16, MineCount: 170, Unique: true},
 		},
 	}
 
@@ -62,7 +61,7 @@ func TestGen(t *testing.T) {
 			for sx := 0; sx < params.Width; sx++ {
 				for sy := 0; sy < params.Height; sy++ {
 					t.Logf("%s @ %d:%d", test.name, sx, sy)
-					_, err := mines.MineGen(params, sx, sy, r)
+					_, err := params.generate(sx, sy, r)
 					if err != nil {
 						t.Log(err)
 						t.Errorf("could not generate game field %s", test.name)
