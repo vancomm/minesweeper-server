@@ -60,10 +60,7 @@ func New(params GameParams, x, y int, r *rand.Rand) (*GameState, error) {
 	return state, err
 }
 
-func (s *GameState) OpenSquare(x, y int) (res int) {
-	Log.Debugf("opening square %d:%d", x, y)
-	defer func() { Log.Debugf("result: %d", res) }()
-
+func (s *GameState) OpenSquare(x, y int) int {
 	i := y*s.Width + x
 	if s.Grid[i] {
 		/*
@@ -168,4 +165,47 @@ func (s *GameState) OpenSquare(x, y int) (res int) {
 	}
 
 	return 0
+}
+
+func (s *GameState) FlagSquare(x, y int) {
+	i := y*s.Width + x
+	if s.PlayerGrid[i] == Unknown {
+		s.PlayerGrid[i] = Mine
+	} else if s.PlayerGrid[i] == Mine {
+		s.PlayerGrid[i] = Unknown
+	}
+}
+
+func (s *GameState) ChordSquare(x, y int) {
+	i := y*s.Width + x
+	if !(0 <= s.PlayerGrid[i] && s.PlayerGrid[i] <= 8) {
+		return
+	}
+	c := int(s.PlayerGrid[i])
+	js := make([]int, 8-c)
+	m := 0
+	for dx := -1; dx <= +1; dx++ {
+		for dy := -1; dy <= +1; dy++ {
+			if 0 <= x+dx && x+dx < s.Width &&
+				0 <= y+dy && y+dy < s.Height &&
+				(dx != 0 || dy != 0) {
+				j := (y+dy)*s.Width + (x + dx)
+				if s.PlayerGrid[j] == Mine {
+					m++
+				} else if s.PlayerGrid[j] == Unknown {
+					js = append(js, j)
+				}
+			}
+		}
+	}
+	if c == m {
+		for _, j := range js {
+			jy := j / s.Width
+			jx := j % s.Width
+			s.OpenSquare(jx, jy)
+			if s.Dead || s.Won {
+				return
+			}
+		}
+	}
 }

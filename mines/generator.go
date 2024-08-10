@@ -18,6 +18,10 @@ type GameParams struct {
 	Unique                   bool
 }
 
+func (p GameParams) ValidateSquare(x, y int) bool {
+	return y*p.Width+x < p.Width*p.Height
+}
+
 func (params GameParams) generate(x, y int, r *rand.Rand) ([]bool, error) {
 	var (
 		w         = params.Width
