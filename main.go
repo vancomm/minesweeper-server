@@ -10,6 +10,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/rs/cors"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/schema"
@@ -275,10 +276,13 @@ func main() {
 	mux.HandleFunc("POST /v1/game/{id}/flag", handleFlag)
 	mux.HandleFunc("POST /v1/game/{id}/chord", handleChord)
 
-	s := useMiddleware(mux, loggingMiddleware)
+	h := useMiddleware(mux,
+		loggingMiddleware,
+		cors.Default().Handler,
+	)
 
 	addr := "localhost:8000"
 	log.Infof("ready to serve @ %s", addr)
 
-	log.Fatal(http.ListenAndServe(addr, s))
+	log.Fatal(http.ListenAndServe(addr, h))
 }

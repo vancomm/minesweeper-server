@@ -182,7 +182,7 @@ func (s *GameState) ChordSquare(x, y int) {
 		return
 	}
 	c := int(s.PlayerGrid[i])
-	js := make([]int, 8-c)
+	js := make([]int, 0, 8-c)
 	m := 0
 	for dx := -1; dx <= +1; dx++ {
 		for dy := -1; dy <= +1; dy++ {
