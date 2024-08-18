@@ -250,7 +250,7 @@ func handleChord(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleStatus(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("ok"))
+	w.Write([]byte("\"ok\""))
 }
 
 func main() {
