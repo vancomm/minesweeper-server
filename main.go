@@ -48,7 +48,7 @@ func main() {
 	flag.Parse()
 	log.Info("starting up")
 
-	db, err := sql.Open("sqlite3", "./sessions.sqlite")
+	db, err := sql.Open("sqlite3", "./data/sessions.sqlite")
 	if err != nil {
 		log.Fatalf("failed to connect sqlite db: %v", err)
 	}
@@ -73,7 +73,7 @@ func main() {
 		cors.Default().Handler,
 	)
 
-	addr := fmt.Sprintf("localhost:%d", port)
+	addr := fmt.Sprintf("0.0.0.0:%d", port)
 	log.Infof("ready to serve @ %s", addr)
 
 	log.Fatal(http.ListenAndServe(addr, h))

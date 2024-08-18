@@ -1,0 +1,12 @@
+services:
+  server:
+    build: .
+    image: mines-server:alpha
+    container_name: mines-server
+    ports:
+      - "8000:8000"
+    volumes:
+      - db-data:/app/data
+
+volumes:
+  db-data:
