@@ -1,12 +1,15 @@
 CGO_ENABLED=1
 BINARY_NAME=bin/main.out
+
+all: ${BINARY_NAME}
+
+.PHONY: all
+
+${BINARY_NAME}:
+	go build -o $@ *.go
  
-build:
-	go build -o ${BINARY_NAME} *.go
- 
-run:
-	go build -o ${BINARY_NAME} *.go
-	./${BINARY_NAME}
+run: ${BINARY_NAME}
+	@$<
  
 test:
 	go test -v ./...
