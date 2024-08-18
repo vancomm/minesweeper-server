@@ -1,0 +1,6 @@
+*.sqlite
+.git
+.gitignore
+.gitattributes
+.vscode
+bin
