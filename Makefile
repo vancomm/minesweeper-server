@@ -8,10 +8,10 @@ all: ${BINARY_NAME}
 ${BINARY_NAME}: $(SOURCES)
 	go build -o $@ *.go
 
-.PHONY: run
-run: ${BINARY_NAME}
+.PHONY: dev
+dev: ${BINARY_NAME}
 	@$<
- 
+
 .PHONY: test
 test:
 	go test -v ./...
