@@ -68,6 +68,7 @@ func main() {
 	mux.HandleFunc("POST /v1/game/{id}/flag", handleFlag)
 	mux.HandleFunc("POST /v1/game/{id}/chord", handleChord)
 	mux.HandleFunc("POST /v1/game/{id}/reveal", handleReveal)
+	mux.HandleFunc("POST /v1/game/{id}/batch", handleBatch)
 
 	h := useMiddleware(mux,
 		loggingMiddleware,
