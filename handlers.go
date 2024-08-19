@@ -29,6 +29,10 @@ type GameSession struct {
 	EndedAt   time.Time
 }
 
+func handleStatus(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("\"ok\""))
+}
+
 func NewGameSession(state mines.GameState) *GameSession {
 	u := [16]byte(uuid.New())
 	sessionId := base64.RawURLEncoding.EncodeToString(u[:])
@@ -83,11 +87,11 @@ func sendSessionJSON(w http.ResponseWriter, session *GameSession) error {
 }
 
 func handleNewGame(w http.ResponseWriter, h *http.Request) {
+	query := h.URL.Query()
 	var (
 		gameParams NewGameParams
 		posParams  PosParams
 	)
-	query := h.URL.Query()
 	if err := dec.Decode(&gameParams, query); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -118,8 +122,8 @@ func handleNewGame(w http.ResponseWriter, h *http.Request) {
 }
 
 func handleGetState(w http.ResponseWriter, r *http.Request) {
-	var session GameSession
 	sessionId := r.PathValue("id")
+	var session GameSession
 	if err := kvs.Get(sessionId, &session); err == ErrNotFound {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -134,14 +138,14 @@ func handleGetState(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleOpen(w http.ResponseWriter, r *http.Request) {
-	var posParams PosParams
 	query := r.URL.Query()
+	var posParams PosParams
 	if err := dec.Decode(&posParams, query); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	var session GameSession
 	sessionId := r.PathValue("id")
+	var session GameSession
 	if err := kvs.Get(sessionId, &session); err == ErrNotFound {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -156,6 +160,7 @@ func handleOpen(w http.ResponseWriter, r *http.Request) {
 	}
 	session.State.OpenSquare(posParams.X, posParams.Y)
 	if session.State.Won || session.State.Dead {
+		session.State.RevealMines()
 		session.EndedAt = time.Now().UTC()
 	}
 	if err := kvs.Set(sessionId, session); err != nil {
@@ -174,8 +179,8 @@ func handleFlag(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	var session GameSession
 	sessionId := r.PathValue("id")
+	var session GameSession
 	if err := kvs.Get(sessionId, &session); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -201,8 +206,8 @@ func handleChord(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	var session GameSession
 	sessionId := r.PathValue("id")
+	var session GameSession
 	if err := kvs.Get(sessionId, &session); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -224,6 +229,26 @@ func handleChord(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleStatus(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("\"ok\""))
+func handleReveal(w http.ResponseWriter, r *http.Request) {
+	sessionId := r.PathValue("id")
+	var session GameSession
+	if err := kvs.Get(sessionId, &session); err == ErrNotFound {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	} else if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Error(err)
+		return
+	}
+	session.State.RevealAll()
+	if session.State.Won || session.State.Dead {
+		session.EndedAt = time.Now().UTC()
+	}
+	if err := kvs.Set(sessionId, session); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Fatal(err)
+	}
+	if err := sendSessionJSON(w, &session); err != nil {
+		log.Error(err)
+	}
 }

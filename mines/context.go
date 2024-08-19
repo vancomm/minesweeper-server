@@ -31,6 +31,7 @@ const (
 	CorrectFlag SquareInfo = 64 // post-game-over
 	Exploded    SquareInfo = 65
 	WrongFlag   SquareInfo = 66
+	Unflagged   SquareInfo = 67
 	// 0-8 for empty with given number of mined neighbors
 )
 

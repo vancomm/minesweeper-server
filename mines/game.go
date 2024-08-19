@@ -209,3 +209,54 @@ func (s *GameState) ChordSquare(x, y int) {
 		}
 	}
 }
+
+func (s *GameState) RevealMines() {
+	if !(s.Dead || s.Won) {
+		s.Dead = true
+	}
+	for i, mine := range s.Grid {
+		if s.PlayerGrid[i] == Unknown && mine {
+			s.PlayerGrid[i] = Unflagged
+		}
+		if s.PlayerGrid[i] == Mine {
+			if mine {
+				s.PlayerGrid[i] = CorrectFlag
+			} else {
+				s.PlayerGrid[i] = WrongFlag
+			}
+		}
+	}
+}
+
+func (s *GameState) RevealAll() {
+	if !(s.Dead || s.Won) {
+		s.Dead = true
+	}
+	for i := range s.Grid {
+		if s.PlayerGrid[i] == Mine {
+			if s.Grid[i] {
+				s.PlayerGrid[i] = CorrectFlag
+			} else {
+				s.PlayerGrid[i] = WrongFlag
+			}
+		} else if s.PlayerGrid[i] == Unknown || s.PlayerGrid[i] == Question {
+			if s.Grid[i] {
+				s.PlayerGrid[i] = Unflagged
+			} else {
+				c := 0
+				x := i % s.Width
+				y := i / s.Width
+				for dx := -1; dx <= +1; dx++ {
+					for dy := -1; dy <= +1; dy++ {
+						j := (y+dy)*s.Width + (x + dx)
+						if 0 <= j && j < len(s.Grid) &&
+							j != i && s.Grid[j] {
+							c++
+						}
+					}
+				}
+				s.PlayerGrid[i] = SquareInfo(c)
+			}
+		}
+	}
+}
