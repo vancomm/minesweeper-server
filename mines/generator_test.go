@@ -20,7 +20,11 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func TestGen(t *testing.T) {
+func TestGenAll(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
 	t.Parallel()
 
 	tests := []struct {
