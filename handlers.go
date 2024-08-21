@@ -2,36 +2,14 @@ package main
 
 import (
 	"encoding/base64"
-	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/vancomm/minesweeper-server/mines"
 )
-
-type NewGameParams struct {
-	Width     int  `schema:"width,required"`
-	Height    int  `schema:"height,required"`
-	MineCount int  `schema:"mine_count,required"`
-	Unique    bool `schema:"unique,required"`
-}
-
-type PosParams struct {
-	X int `schema:"x,required"`
-	Y int `schema:"y,required"`
-}
-
-type GameSession struct {
-	SessionId string
-	State     mines.GameState
-	StartedAt time.Time
-	EndedAt   time.Time
-}
 
 func handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("\"ok\""))
@@ -45,49 +23,6 @@ func NewGameSession(state mines.GameState) *GameSession {
 		State:     state,
 		StartedAt: time.Now().UTC(),
 	}
-}
-
-type GameSessionJSON struct {
-	SessionId string         `json:"session_id"`
-	Grid      mines.GridInfo `json:"grid"`
-	Width     int            `json:"width"`
-	Height    int            `json:"height"`
-	MineCount int            `json:"mine_count"`
-	Unique    bool           `json:"unique"`
-	Dead      bool           `json:"dead"`
-	Won       bool           `json:"won"`
-	StartedAt int64          `json:"started_at"`
-	EndedAt   *int64         `json:"ended_at,omitempty"`
-}
-
-func (s GameSession) MarshalJSON() ([]byte, error) {
-	var endedAt *int64
-	if !s.EndedAt.IsZero() {
-		e := s.EndedAt.Unix()
-		endedAt = &e
-	}
-	return json.Marshal(GameSessionJSON{
-		SessionId: s.SessionId,
-		Grid:      s.State.PlayerGrid,
-		Width:     s.State.Width,
-		Height:    s.State.Height,
-		MineCount: s.State.MineCount,
-		Unique:    s.State.Unique,
-		Dead:      s.State.Dead,
-		Won:       s.State.Won,
-		StartedAt: s.StartedAt.Unix(),
-		EndedAt:   endedAt,
-	})
-}
-
-func sendJSON(w http.ResponseWriter, v any) error {
-	payload, err := json.Marshal(v)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return err
-	}
-	_, err = w.Write(payload)
-	return err
 }
 
 func handleNewGame(w http.ResponseWriter, h *http.Request) {
@@ -259,34 +194,6 @@ func handleReveal(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func executeBatchCommand(s *mines.GameState, c string) (err error) {
-	parts := strings.Split(c, " ")
-	if len(parts) != 3 {
-		return errors.New("commands must have three parts")
-	}
-	var x, y int
-	if x, err = strconv.Atoi(parts[1]); err != nil {
-		return errors.New("second command argument must be an int")
-	}
-	if y, err = strconv.Atoi(parts[2]); err != nil {
-		return errors.New("third command argument must be an int")
-	}
-	if !s.ValidateSquare(x, y) {
-		return errors.New("invalid square coordinates")
-	}
-	switch parts[0] {
-	case "o":
-		s.OpenSquare(x, y)
-	case "c":
-		s.ChordSquare(x, y)
-	case "f":
-		s.FlagSquare(x, y)
-	default:
-		return errors.New("invalid command")
-	}
-	return
-}
-
 // Accepts newline-separated commands transferred via body of following syntax:
 //
 //	o x y // open a square at x:y
@@ -317,7 +224,7 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 	}
 	lines := strings.TrimSpace(string(body))
 	for i, c := range byPiece(lines, "\n") {
-		if err := executeBatchCommand(&session.State, c); err != nil {
+		if err := executeCommand(&session.State, c); err != nil {
 			payload := struct {
 				loc     int
 				message string

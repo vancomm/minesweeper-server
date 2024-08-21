@@ -1,6 +1,11 @@
 package main
 
-import "net/http"
+import (
+	"bufio"
+	"errors"
+	"net"
+	"net/http"
+)
 
 type Middleware func(http.Handler) http.Handler
 
@@ -15,6 +20,7 @@ func useMiddleware(s *http.ServeMux, mws ...Middleware) http.Handler {
 type loggingResponseWriter struct {
 	http.ResponseWriter
 	statusCode int
+	hijacked   bool
 }
 
 func (w *loggingResponseWriter) WriteHeader(statusCode int) {
@@ -22,12 +28,25 @@ func (w *loggingResponseWriter) WriteHeader(statusCode int) {
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
+func (w *loggingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, errors.New("hijack not supported")
+	}
+	w.hijacked = true
+	return h.Hijack()
+}
+
 func loggingMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Infof("--> %s %s", r.Method, r.URL.String())
-		wrapped := &loggingResponseWriter{w, http.StatusOK}
+		wrapped := &loggingResponseWriter{w, http.StatusOK, false}
 		h.ServeHTTP(wrapped, r)
+		message := "<-- %d %s"
+		if wrapped.hijacked {
+			message += " (hijacked)"
+		}
 		code := wrapped.statusCode
-		log.Infof("<-- %d %s", code, http.StatusText(code))
+		log.Infof(message, code, http.StatusText(code))
 	})
 }
