@@ -156,8 +156,8 @@ func (s *GameState) OpenSquare(x, y int) int {
 	if ncovered == nmines {
 		for yy := range s.Height {
 			for xx := range s.Width {
-				if s.PlayerGrid[yy*s.Width+xx] < 0 {
-					s.PlayerGrid[yy*s.Width+xx] = Mine
+				if s.PlayerGrid[yy*s.Width+xx] == -2 {
+					s.PlayerGrid[yy*s.Width+xx] = Unflagged
 				}
 			}
 		}
