@@ -8,7 +8,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var upgrader websocket.Upgrader
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		log.Debug("\tws origin: ", r.Host)
+		return true
+	},
+}
 
 func handleConnectWs(w http.ResponseWriter, r *http.Request) {
 	sessionId := r.PathValue("id")
@@ -39,6 +44,7 @@ func handleConnectWs(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		text := strings.TrimSpace(string(message))
+		log.Debug("\t> ", text)
 		for _, c := range byPiece(text, "\n") {
 			if err := executeCommand(&session.State, c); err != nil {
 				log.Error("command: ", err)
@@ -57,5 +63,6 @@ func handleConnectWs(w http.ResponseWriter, r *http.Request) {
 			log.Error("write: ", err)
 			break
 		}
+		log.Debug("\t< <session data>")
 	}
 }
