@@ -63,12 +63,11 @@ func (s *Store) Get(key string, value any) error {
 		return ErrNotFound
 	} else if err != nil {
 		return err
-	}
-	if value == nil {
+	} else if value == nil {
 		return nil
+	} else {
+		return gob.NewDecoder(bytes.NewReader(v)).Decode(value)
 	}
-	dec := gob.NewDecoder(bytes.NewReader(v))
-	return dec.Decode(value)
 }
 
 // Inserts a new key-value pair or updates an existing one.
@@ -99,4 +98,29 @@ func (s *Store) Delete(key string) error {
 
 	_, err := s.db.Exec(`DELETE FROM `+s.name+` WHERE key = ?;`, key)
 	return err
+}
+
+func (s *Store) Count() (count int, err error) {
+	err = s.db.QueryRow(`SELECT count(*) from ` + s.name).Scan(&count)
+	return
+}
+
+func (s *Store) GetAllKeys() ([]string, error) {
+	var keys []string
+	rows, err := s.db.Query(`SELECT key from ` + s.name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return keys, nil
 }

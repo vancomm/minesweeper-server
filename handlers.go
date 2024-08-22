@@ -249,3 +249,15 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 		log.Error(err)
 	}
 }
+
+func handleRecords(w http.ResponseWriter, r *http.Request) {
+	records, err := compileGameRecords()
+	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if err := sendJSON(w, records); err != nil {
+		log.Error(err)
+	}
+}

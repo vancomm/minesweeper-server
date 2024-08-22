@@ -3,9 +3,11 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"maps"
 	"math/rand/v2"
 	"os"
 	"reflect"
+	"slices"
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -191,5 +193,73 @@ func TestStoreDeleteExisting(t *testing.T) {
 		} else {
 			t.Fatalf("expected to get not found err, instead got %v", err)
 		}
+	}
+}
+
+func TestStoreCount(t *testing.T) {
+	s, teardown, err := setupTestStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown()
+
+	rows := map[string]int{
+		"a": 1,
+		"b": 2,
+		"c": 3,
+		"d": 4,
+	}
+	for key, value := range rows {
+		if err := s.Set(key, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if count, err := s.Count(); err != nil {
+		t.Fatal(err)
+	} else if count != len(rows) {
+		t.Fatalf("have %d, want %d", count, len(rows))
+	}
+
+	delete(rows, "a")
+	if err := s.Delete("a"); err != nil {
+		t.Fatal(err)
+	}
+
+	if count, err := s.Count(); err != nil {
+		t.Fatal(err)
+	} else if count != len(rows) {
+		t.Fatalf("have %d, want %d", count, len(rows))
+	}
+}
+
+func TestStoreGetAllKeys(t *testing.T) {
+	s, teardown, err := setupTestStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown()
+
+	rows := map[string]int{
+		"a": 1,
+		"b": 2,
+		"c": 3,
+		"d": 4,
+	}
+	for key, value := range rows {
+		if err := s.Set(key, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	keys, err := s.GetAllKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedKeys := slices.Collect(maps.Keys(rows))
+	slices.Sort(keys)
+	slices.Sort(expectedKeys)
+	if !reflect.DeepEqual(keys, expectedKeys) {
+		t.Fatalf("have %v, want %v", keys, expectedKeys)
 	}
 }

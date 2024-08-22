@@ -114,7 +114,11 @@ func main() {
 
 	db, err := sql.Open("sqlite3", "./data/sessions.sqlite")
 	if err != nil {
-		log.Fatalf("failed to connect sqlite db: %v", err)
+		log.Fatal(err)
+	}
+	pingErr := db.Ping()
+	if pingErr != nil {
+		log.Fatal(pingErr)
 	}
 	defer db.Close()
 
@@ -133,6 +137,8 @@ func main() {
 	mux.HandleFunc("POST /v1/game/{id}/chord", handleChord)
 	mux.HandleFunc("POST /v1/game/{id}/reveal", handleReveal)
 	mux.HandleFunc("POST /v1/game/{id}/batch", handleBatch)
+
+	mux.HandleFunc("GET /v1/records", handleRecords)
 
 	mux.HandleFunc("/v1/game/{id}/connect", handleConnectWs)
 
