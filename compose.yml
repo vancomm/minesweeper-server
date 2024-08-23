@@ -1,13 +1,23 @@
 services:
   server:
-    build: .
     image: vancomm/mines-server:latest
     container_name: mines-server
     ports:
       - "8000:8000"
+    links:
+      - db
     volumes:
       - db-data:/app/data
   
+  db:
+    image: postgres:16.4@sha256:c62fdb7fd6f519ef425c54760894c74e8d0cb04fbf4f7d3d79aafd86bae24edd
+    container_name: mines-db
+    restart: always
+    expose:
+      - 5432
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
   watchtower:
     image: containrrr/watchtower
     volumes:
@@ -16,3 +26,4 @@ services:
 
 volumes:
   db-data:
+  postgres-data:

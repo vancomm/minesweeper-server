@@ -1,0 +1,22 @@
+# this config is meant to override docker-compose.yml
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.local      
+    image: vancomm/mines-server:dev
+    environment:
+      - DB_URL=postgres://postgres:postgres@db:5432/main
+  
+  db:
+    ports:
+      - "54320:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: main
+      POSTGRES_HOST_AUTH_METHOD: md5
+
+  watchtower:
+    deploy:
+      replicas: 0

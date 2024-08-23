@@ -2,14 +2,49 @@ package main
 
 import (
 	"encoding/base64"
+	"hash/maphash"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/schema"
+	"github.com/sirupsen/logrus"
 	"github.com/vancomm/minesweeper-server/mines"
 )
+
+var (
+	dec = schema.NewDecoder()
+	rnd = rand.New(rand.NewPCG(
+		new(maphash.Hash).Sum64(),
+		new(maphash.Hash).Sum64(),
+	))
+)
+
+func init() {
+	dec.IgnoreUnknownKeys(true)
+}
+
+func init() {
+	log.SetLevel(logrus.DebugLevel)
+	mines.Log.SetLevel(logrus.DebugLevel)
+
+	dec.IgnoreUnknownKeys(true)
+}
+
+type NewGameParams struct {
+	Width     int  `schema:"width,required"`
+	Height    int  `schema:"height,required"`
+	MineCount int  `schema:"mine_count,required"`
+	Unique    bool `schema:"unique,required"`
+}
+
+type PosParams struct {
+	X int `schema:"x,required"`
+	Y int `schema:"y,required"`
+}
 
 func handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("\"ok\""))
@@ -25,8 +60,8 @@ func NewGameSession(state mines.GameState) *GameSession {
 	}
 }
 
-func handleNewGame(w http.ResponseWriter, h *http.Request) {
-	query := h.URL.Query()
+func handleNewGame(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
 	var (
 		gameParams NewGameParams
 		posParams  PosParams
@@ -44,7 +79,7 @@ func handleNewGame(w http.ResponseWriter, h *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	game, err := mines.New(params, posParams.X, posParams.Y, r)
+	game, err := mines.New(params, posParams.X, posParams.Y, rnd)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Error(err)

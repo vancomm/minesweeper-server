@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"iter"
+	"net/http"
 	"strings"
 )
 
@@ -18,4 +20,14 @@ func byPiece(s string, sep string) iter.Seq2[int, string] {
 			i += 1
 		}
 	}
+}
+
+func sendJSON(w http.ResponseWriter, v any) error {
+	payload, err := json.Marshal(v)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return err
+	}
+	_, err = w.Write(payload)
+	return err
 }
