@@ -3,15 +3,15 @@ services:
   server:
     build:
       context: .
-      dockerfile: Dockerfile.local      
+      dockerfile: Dockerfile.local
     image: vancomm/mines-server:dev
-    env_file:
+    env_file: !override
       - "env/dev.env"
   
   db:
     ports:
       - "54320:5432"
-    env_file:
+    env_file: !override
       - "env/dev.env"
 
   watchtower:
