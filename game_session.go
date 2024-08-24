@@ -2,13 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/vancomm/minesweeper-server/mines"
 )
 
 type GameSession struct {
-	SessionId string
+	SessionId int
+	PlayerId  *int
 	State     mines.GameState
 	StartedAt time.Time
 	EndedAt   time.Time
@@ -34,7 +36,7 @@ func (s GameSession) MarshalJSON() ([]byte, error) {
 		endedAt = &e
 	}
 	return json.Marshal(GameSessionJSON{
-		SessionId: s.SessionId,
+		SessionId: strconv.Itoa(s.SessionId),
 		Grid:      s.State.PlayerGrid,
 		Width:     s.State.Width,
 		Height:    s.State.Height,

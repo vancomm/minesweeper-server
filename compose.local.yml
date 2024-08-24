@@ -5,17 +5,14 @@ services:
       context: .
       dockerfile: Dockerfile.local      
     image: vancomm/mines-server:dev
-    environment:
-      - DB_URL=postgres://postgres:postgres@db:5432/main
+    env_file:
+      - "env/dev.env"
   
   db:
     ports:
       - "54320:5432"
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: main
-      POSTGRES_HOST_AUTH_METHOD: md5
+    env_file:
+      - "env/dev.env"
 
   watchtower:
     deploy:

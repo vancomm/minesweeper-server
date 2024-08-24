@@ -2,12 +2,17 @@ services:
   server:
     image: vancomm/mines-server:latest
     container_name: mines-server
+    command: >
+      sh -c "tern migrate --migrations migrations &&
+            ./server -port 8000"
+    depends_on:
+      - db
     ports:
       - "8000:8000"
     links:
       - db
-    volumes:
-      - db-data:/app/data
+    env_file:
+      - prod.env
   
   db:
     image: postgres:16.4@sha256:c62fdb7fd6f519ef425c54760894c74e8d0cb04fbf4f7d3d79aafd86bae24edd
@@ -17,6 +22,8 @@ services:
       - 5432
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    env_file:
+      - prod.env
 
   watchtower:
     image: containrrr/watchtower
@@ -25,5 +32,4 @@ services:
     command: -i 3600 mines-server
 
 volumes:
-  db-data:
   postgres-data:

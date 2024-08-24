@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/rs/cors"
 
 	"github.com/sirupsen/logrus"
@@ -26,59 +24,50 @@ func init() {
 	flag.IntVar(&port, "p", defaultPort, usage+" (shorthand)")
 }
 
-var (
-	log = logrus.New()
-	kvs *Store
-	pg  *postgres
-)
+var log = logrus.New()
 
 func init() {
 	log.SetLevel(logrus.DebugLevel)
 	mines.Log.SetLevel(logrus.DebugLevel)
 }
 
+var pg *postgres
+
 func main() {
 	flag.Parse()
 	log.Info("starting up")
 
+	dbUrl := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s",
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("POSTGRES_USER"),
+		os.Getenv("POSTGRES_PASSWORD"),
+		os.Getenv("POSTGRES_DB"),
+	)
 	var err error
-	pg, err = NewPostgres(context.Background(), os.Getenv("DB_URL"))
+	pg, err = NewPostgres(context.Background(), dbUrl)
 	if err != nil {
 		log.Fatal("unable to create connection pool: ", err)
 	}
 	defer pg.Close()
-
-	db, err := sql.Open("sqlite3", "./data/sessions.sqlite")
-	if err != nil {
-		log.Fatal(err)
-	}
-	pingErr := db.Ping()
-	if pingErr != nil {
-		log.Fatal(pingErr)
-	}
-	defer db.Close()
-
-	kvs, err = NewStore(db, "sessions")
-	if err != nil {
-		log.Fatalf("failed to create store: %v", err)
+	if err := pg.Ping(context.Background()); err != nil {
+		log.Fatal("unable to ping database: ", err)
 	}
 
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /v1/status", handleStatus)
+	mux.HandleFunc("GET /v1/records", handleRecords)
+
 	mux.HandleFunc("POST /v1/game", handleNewGame)
-	mux.HandleFunc("GET /v1/game/{id}", handleGetState)
+	mux.HandleFunc("GET /v1/game/{id}", handleGetGame)
 	mux.HandleFunc("POST /v1/game/{id}/open", handleOpen)
 	mux.HandleFunc("POST /v1/game/{id}/flag", handleFlag)
 	mux.HandleFunc("POST /v1/game/{id}/chord", handleChord)
 	mux.HandleFunc("POST /v1/game/{id}/reveal", handleReveal)
 	mux.HandleFunc("POST /v1/game/{id}/batch", handleBatch)
 
-	mux.HandleFunc("GET /v1/records", handleRecords)
-
 	mux.HandleFunc("/v1/game/{id}/connect", handleConnectWs)
-
-	mux.HandleFunc("POST /v2/game", handlePostGame)
 
 	h := useMiddleware(mux,
 		loggingMiddleware,

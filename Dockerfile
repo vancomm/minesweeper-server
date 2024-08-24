@@ -4,6 +4,8 @@ WORKDIR /app
 
 COPY . .
 
+RUN go install github.com/jackc/tern/v2@latest
+
 RUN go mod download
 
 RUN go build -o server

@@ -1,17 +1,17 @@
 package main
 
 import (
-	"encoding/base64"
+	"context"
 	"hash/maphash"
 	"io"
 	"math/rand/v2"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/schema"
-	"github.com/sirupsen/logrus"
+	"github.com/jackc/pgx/v5"
 	"github.com/vancomm/minesweeper-server/mines"
 )
 
@@ -24,13 +24,6 @@ var (
 )
 
 func init() {
-	dec.IgnoreUnknownKeys(true)
-}
-
-func init() {
-	log.SetLevel(logrus.DebugLevel)
-	mines.Log.SetLevel(logrus.DebugLevel)
-
 	dec.IgnoreUnknownKeys(true)
 }
 
@@ -48,16 +41,6 @@ type PosParams struct {
 
 func handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("\"ok\""))
-}
-
-func NewGameSession(state mines.GameState) *GameSession {
-	u := [16]byte(uuid.New())
-	sessionId := base64.RawURLEncoding.EncodeToString(u[:])
-	return &GameSession{
-		SessionId: sessionId,
-		State:     state,
-		StartedAt: time.Now().UTC(),
-	}
 }
 
 func handleNewGame(w http.ResponseWriter, r *http.Request) {
@@ -85,20 +68,24 @@ func handleNewGame(w http.ResponseWriter, r *http.Request) {
 		log.Error(err)
 		return
 	}
-	session := NewGameSession(*game)
-	if err = kvs.Set(session.SessionId, *session); err != nil {
+	session, err := pg.CreateGameSession(context.Background(), game)
+	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		log.Fatal(err)
+		log.Error(err)
 	}
 	if err := sendJSON(w, session); err != nil {
 		log.Error(err)
 	}
 }
 
-func handleGetState(w http.ResponseWriter, r *http.Request) {
-	sessionId := r.PathValue("id")
-	var session GameSession
-	if err := kvs.Get(sessionId, &session); err == ErrNotFound {
+func handleGetGame(w http.ResponseWriter, r *http.Request) {
+	sessionId, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	session, err := pg.GetSession(context.Background(), sessionId)
+	if err == pgx.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	} else if err != nil {
@@ -118,9 +105,13 @@ func handleOpen(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	sessionId := r.PathValue("id")
-	var session GameSession
-	if err := kvs.Get(sessionId, &session); err == ErrNotFound {
+	sessionId, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	session, err := pg.GetSession(context.Background(), sessionId)
+	if err == pgx.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	} else if err != nil {
@@ -137,7 +128,9 @@ func handleOpen(w http.ResponseWriter, r *http.Request) {
 		session.State.RevealMines()
 		session.EndedAt = time.Now().UTC()
 	}
-	if err := kvs.Set(sessionId, session); err != nil {
+	if err := pg.UpdateGameSession(
+		context.Background(), session,
+	); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
@@ -153,10 +146,18 @@ func handleFlag(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	sessionId := r.PathValue("id")
-	var session GameSession
-	if err := kvs.Get(sessionId, &session); err != nil {
+	sessionId, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	session, err := pg.GetSession(context.Background(), sessionId)
+	if err == pgx.ErrNoRows {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	} else if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Error(err)
 		return
 	}
 	if !session.State.ValidateSquare(posParams.X, posParams.Y) {
@@ -164,7 +165,9 @@ func handleFlag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session.State.FlagSquare(posParams.X, posParams.Y)
-	if err := kvs.Set(sessionId, session); err != nil {
+	if err := pg.UpdateGameSession(
+		context.Background(), session,
+	); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
@@ -180,10 +183,18 @@ func handleChord(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	sessionId := r.PathValue("id")
-	var session GameSession
-	if err := kvs.Get(sessionId, &session); err != nil {
+	sessionId, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	session, err := pg.GetSession(context.Background(), sessionId)
+	if err == pgx.ErrNoRows {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	} else if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Error(err)
 		return
 	}
 	if !session.State.ValidateSquare(posParams.X, posParams.Y) {
@@ -195,7 +206,9 @@ func handleChord(w http.ResponseWriter, r *http.Request) {
 		session.State.RevealMines()
 		session.EndedAt = time.Now().UTC()
 	}
-	if err := kvs.Set(sessionId, session); err != nil {
+	if err := pg.UpdateGameSession(
+		context.Background(), session,
+	); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
@@ -205,9 +218,13 @@ func handleChord(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleReveal(w http.ResponseWriter, r *http.Request) {
-	sessionId := r.PathValue("id")
-	var session GameSession
-	if err := kvs.Get(sessionId, &session); err == ErrNotFound {
+	sessionId, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	session, err := pg.GetSession(context.Background(), sessionId)
+	if err == pgx.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	} else if err != nil {
@@ -216,11 +233,12 @@ func handleReveal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session.State.RevealAll()
-	if session.State.Won || session.State.Dead {
-		session.State.RevealMines()
+	if session.EndedAt.IsZero() {
 		session.EndedAt = time.Now().UTC()
 	}
-	if err := kvs.Set(sessionId, session); err != nil {
+	if err := pg.UpdateGameSession(
+		context.Background(), session,
+	); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
@@ -229,21 +247,25 @@ func handleReveal(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Accepts newline-separated commands transferred via body of following syntax:
-//
-//	o x y // open a square at x:y
-//	c x y // chord a square at x:y
-//	f x y // flag a square at x:y
-//
-// Commands are interpreted in the order they are listed. If any command results
-// in a game over, interpretation stops and game state is returned immediately.
-// If any command is malformed, all changes to game state will be dropped and
-// response will have a status of [http.StatusBadRequest] and a payload with
-// command's line number and an error message.
+// // Accepts newline-separated commands transferred via body of following syntax:
+// //
+// //	o x y // open a square at x:y
+// //	c x y // chord a square at x:y
+// //	f x y // flag a square at x:y
+// //
+// // Commands are interpreted in the order they are listed. If any command results
+// // in a game over, interpretation stops and game state is returned immediately.
+// // If any command is malformed, all changes to game state will be dropped and
+// // response will have a status of [http.StatusBadRequest] and a payload with
+// // command's line number and an error message.
 func handleBatch(w http.ResponseWriter, r *http.Request) {
-	sessionId := r.PathValue("id")
-	var session GameSession
-	if err := kvs.Get(sessionId, &session); err == ErrNotFound {
+	sessionId, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	session, err := pg.GetSession(context.Background(), sessionId)
+	if err == pgx.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	} else if err != nil {
@@ -276,7 +298,9 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	if err := kvs.Set(sessionId, session); err != nil {
+	if err := pg.UpdateGameSession(
+		context.Background(), session,
+	); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
@@ -286,7 +310,7 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRecords(w http.ResponseWriter, r *http.Request) {
-	records, err := compileGameRecords()
+	records, err := compileGameRecords(context.Background())
 	if err != nil {
 		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)

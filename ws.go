@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/jackc/pgx/v5"
 )
 
 var upgrader = websocket.Upgrader{
@@ -16,9 +19,13 @@ var upgrader = websocket.Upgrader{
 }
 
 func handleConnectWs(w http.ResponseWriter, r *http.Request) {
-	sessionId := r.PathValue("id")
-	var session GameSession
-	if err := kvs.Get(sessionId, &session); err == ErrNotFound {
+	sessionId, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	session, err := pg.GetSession(context.Background(), sessionId)
+	if err == pgx.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	} else if err != nil {
@@ -56,7 +63,10 @@ func handleConnectWs(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
-		if err := kvs.Set(sessionId, session); err != nil {
+		if err := pg.UpdateGameSession(
+			context.Background(), session,
+		); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
 			log.Fatal(err)
 		}
 		if err := c.WriteJSON(session); err != nil {
