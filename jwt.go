@@ -63,26 +63,42 @@ func setPlayerCookies(w http.ResponseWriter, token string) {
 	parts := strings.Split(token, ".")
 	header, payload, signature := parts[0], parts[1], parts[2]
 	jsCookie := http.Cookie{
-		Name:    "auth",
-		Path:    "/",
-		Value:   header + "." + payload,
-		Secure:  !development,
-		Expires: time.Now().Add(jwtLifetime),
+		Name:        "auth",
+		Path:        "/",
+		Value:       header + "." + payload,
+		Secure:      !development,
+		Expires:     time.Now().Add(jwtLifetime),
+		SameSite:    http.SameSiteNoneMode,
+		Partitioned: true,
 	}
 	httpCookie := http.Cookie{
-		Name:     "sign",
-		Path:     "/",
-		Value:    signature,
-		Secure:   !development,
-		HttpOnly: true,
+		Name:        "sign",
+		Path:        "/",
+		Value:       signature,
+		Secure:      !development,
+		HttpOnly:    true,
+		SameSite:    http.SameSiteNoneMode,
+		Partitioned: true,
 	}
 	http.SetCookie(w, &jsCookie)
 	http.SetCookie(w, &httpCookie)
 }
 
 func clearPlayerCookies(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: "auth", Path: "/", MaxAge: -1})
-	http.SetCookie(w, &http.Cookie{Name: "sign", Path: "/", MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{
+		Name:        "auth",
+		Path:        "/",
+		MaxAge:      -1,
+		SameSite:    http.SameSiteNoneMode,
+		Partitioned: true,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:        "sign",
+		Path:        "/",
+		MaxAge:      -1,
+		SameSite:    http.SameSiteNoneMode,
+		Partitioned: true,
+	})
 }
 
 func getJWTFromCookies(r *http.Request) (string, error) {
