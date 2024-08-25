@@ -13,6 +13,8 @@ services:
       - db
     env_file:
       - prod.env
+    volumes:
+      - ./secrets:/app/secrets
   
   db:
     image: postgres:16.4@sha256:c62fdb7fd6f519ef425c54760894c74e8d0cb04fbf4f7d3d79aafd86bae24edd
