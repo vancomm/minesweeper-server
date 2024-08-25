@@ -36,7 +36,46 @@ func (pg *postgres) Close() {
 	pg.db.Close()
 }
 
-func (pg *postgres) CreateGameSession(
+func (pg *postgres) CreatePlayer(
+	ctx context.Context, username string, passwordHash []byte,
+) (*Player, error) {
+	var playerId int
+	if err := pg.db.QueryRow(ctx, `
+		INSERT INTO player (
+			username, password_hash
+		) 
+		VALUES (
+			@username, @password_hash
+		)
+		RETURNING player_id`,
+		pgx.NamedArgs{
+			"username":      username,
+			"password_hash": passwordHash,
+		}).Scan(&playerId); err != nil {
+		return nil, err
+	}
+	player := &Player{
+		PlayerId: playerId,
+		Username: username,
+	}
+	return player, nil
+}
+
+func (pg *postgres) GetPlayer(
+	ctx context.Context, username string,
+) (*Player, error) {
+	rows, err := pg.db.Query(ctx, `
+		SELECT player_id, username, password_hash
+		FROM player
+		WHERE username = $1;`,
+		username)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByName[Player])
+}
+
+func (pg *postgres) CreateAnonymousGameSession(
 	ctx context.Context, state *mines.GameState,
 ) (*GameSession, error) {
 	var (
@@ -50,12 +89,51 @@ func (pg *postgres) CreateGameSession(
 	if err := pg.db.QueryRow(ctx, `
 		INSERT INTO game_session (
 			width, height, mine_count, "unique", dead, won, state
-		)
+		) 
 		VALUES (
 			@width, @height, @mine_count, @unique, @dead, @won, @state
-		)
+		) 
 		RETURNING game_session_id, started_at;`,
 		pgx.NamedArgs{
+			"width":      state.Width,
+			"height":     state.Height,
+			"mine_count": state.MineCount,
+			"unique":     state.Unique,
+			"dead":       state.Dead,
+			"won":        state.Won,
+			"state":      stateBuf.Bytes(),
+		}).Scan(&gameSessionId, &startedAt); err != nil {
+		return nil, err
+	}
+	session := &GameSession{
+		SessionId: gameSessionId,
+		State:     *state,
+		StartedAt: startedAt,
+	}
+	return session, nil
+}
+
+func (pg *postgres) CreatePlayerGameSession(
+	ctx context.Context, playerId int, state *mines.GameState,
+) (*GameSession, error) {
+	var (
+		stateBuf      bytes.Buffer
+		gameSessionId int
+		startedAt     time.Time
+	)
+	if err := gob.NewEncoder(&stateBuf).Encode(state); err != nil {
+		return nil, err
+	}
+	if err := pg.db.QueryRow(ctx, `
+		INSERT INTO game_session (
+			player_id, width, height, mine_count, "unique", dead, won, state
+		) 
+		VALUES (
+			@player_id, @width, @height, @mine_count, @unique, @dead, @won, @state
+		) 
+		RETURNING game_session_id, started_at;`,
+		pgx.NamedArgs{
+			"player_id":  playerId,
 			"width":      state.Width,
 			"height":     state.Height,
 			"mine_count": state.MineCount,

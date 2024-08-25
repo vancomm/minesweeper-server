@@ -39,10 +39,6 @@ type PosParams struct {
 	Y int `schema:"y,required"`
 }
 
-func handleStatus(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("\"ok\""))
-}
-
 func handleNewGame(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	var (
@@ -68,7 +64,16 @@ func handleNewGame(w http.ResponseWriter, r *http.Request) {
 		log.Error(err)
 		return
 	}
-	session, err := pg.CreateGameSession(context.Background(), game)
+	var session *GameSession
+	if claims, ok := r.Context().Value(ctxKeyPlayerClaims).(*PlayerClaims); ok {
+		log.Debug("creating session for player ", claims.Username)
+		session, err = pg.CreatePlayerGameSession(
+			context.Background(), claims.PlayerId, game,
+		)
+	} else {
+		log.Debug("creating anonymous session")
+		session, err = pg.CreateAnonymousGameSession(context.Background(), game)
+	}
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Error(err)
@@ -311,6 +316,25 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 
 func handleRecords(w http.ResponseWriter, r *http.Request) {
 	records, err := compileGameRecords(context.Background())
+	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if err := sendJSON(w, records); err != nil {
+		log.Error(err)
+	}
+}
+
+func handlePlayerRecords(w http.ResponseWriter, r *http.Request) {
+	claims, ok := r.Context().Value(ctxKeyPlayerClaims).(*PlayerClaims)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	records, err := compilePlayerGameRecords(
+		context.Background(), claims.Username,
+	)
 	if err != nil {
 		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)

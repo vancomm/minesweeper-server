@@ -2,9 +2,12 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"net"
 	"net/http"
+
+	"github.com/rs/cors"
 )
 
 type Middleware func(http.Handler) http.Handler
@@ -50,3 +53,47 @@ func loggingMiddleware(h http.Handler) http.Handler {
 		log.Infof(message, code, http.StatusText(code))
 	})
 }
+
+type ctxKey int
+
+const ctxKeyPlayerClaims ctxKey = iota
+
+func authMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, err := getJWTFromCookies(r)
+		log.Debug(token, err)
+		if err == nil {
+			claims, err := tryParseJWTCookie(token)
+			if err == nil {
+				ctx := context.WithValue(
+					r.Context(), ctxKeyPlayerClaims, claims,
+				)
+				r = r.WithContext(ctx)
+				// refresh token expiry
+				if token, err := createPlayerToken(
+					claims.PlayerId, claims.Username,
+				); err == nil {
+					setPlayerCookies(w, token)
+				}
+			} else {
+				// clear malformed/expired token
+				clearPlayerCookies(w)
+			}
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
+var corsMiddleware = cors.New(cors.Options{
+	AllowOriginFunc: func(origin string) bool { return true }, // HACK f*ck you cors!!!
+	AllowedMethods: []string{
+		http.MethodHead,
+		http.MethodGet,
+		http.MethodPost,
+		http.MethodPut,
+		http.MethodPatch,
+		http.MethodDelete,
+	},
+	AllowedHeaders:   []string{"*"},
+	AllowCredentials: true,
+}).Handler

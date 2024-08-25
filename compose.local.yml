@@ -7,6 +7,8 @@ services:
     image: vancomm/mines-server:dev
     env_file: !override
       - "env/dev.env"
+    volumes:
+      - ./secrets:/app/secrets
   
   db:
     ports:

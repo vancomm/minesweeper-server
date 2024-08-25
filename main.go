@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/rs/cors"
-
 	"github.com/sirupsen/logrus"
 	"github.com/vancomm/minesweeper-server/mines"
 )
+
+var _, development = os.LookupEnv("DEVELOPMENT")
 
 var port int
 
@@ -32,6 +32,16 @@ func init() {
 }
 
 var pg *postgres
+
+// This endpoint may be called for the side effect in [authMiddleware] that
+// clears expired auth cookies
+func handleStatus(w http.ResponseWriter, r *http.Request) {
+	if claims, ok := r.Context().Value(ctxKeyPlayerClaims).(*PlayerClaims); ok {
+		w.Write([]byte("you are authenticated as " + claims.Username))
+	} else {
+		w.Write([]byte("\"ok\""))
+	}
+}
 
 func main() {
 	flag.Parse()
@@ -56,8 +66,13 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("POST /v1/register", handleRegister)
+	mux.HandleFunc("POST /v1/login", handleLogin)
+	mux.HandleFunc("POST /v1/logout", handleLogout)
+
 	mux.HandleFunc("GET /v1/status", handleStatus)
 	mux.HandleFunc("GET /v1/records", handleRecords)
+	mux.HandleFunc("GET /v1/myrecords", handlePlayerRecords)
 
 	mux.HandleFunc("POST /v1/game", handleNewGame)
 	mux.HandleFunc("GET /v1/game/{id}", handleGetGame)
@@ -70,8 +85,11 @@ func main() {
 	mux.HandleFunc("/v1/game/{id}/connect", handleConnectWs)
 
 	h := useMiddleware(mux,
+		corsMiddleware,
+		authMiddleware,
 		loggingMiddleware,
-		cors.Default().Handler,
+		// cors.AllowAll().Handler,
+		// corsMiddleware,
 	)
 
 	addr := fmt.Sprintf("0.0.0.0:%d", port)

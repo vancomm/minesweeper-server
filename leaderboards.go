@@ -1,8 +1,13 @@
 package main
 
-import "context"
+import (
+	"context"
+
+	"github.com/jackc/pgx/v5"
+)
 
 type GameRecord struct {
+	Username  *string `json:"username"`
 	Width     int     `json:"width"`
 	Height    int     `json:"height"`
 	MineCount int     `json:"mine_count"`
@@ -11,31 +16,39 @@ type GameRecord struct {
 }
 
 func compileGameRecords(ctx context.Context) ([]GameRecord, error) {
-	records := []GameRecord{}
 	rows, err := pg.db.Query(ctx, `
-	SELECT width
+	SELECT username 
+		, width
 		, height
 		, mine_count
 		, "unique"
 		, extract(epoch from (ended_at - started_at)) playtime
 	FROM game_session
+	LEFT OUTER JOIN player USING (player_id)
 	WHERE won = true AND dead = false AND ended_at IS NOT NULL
 	ORDER BY playtime;`)
 	if err != nil {
 		return nil, err
 	}
-	for rows.Next() {
-		var record GameRecord
-		if err := rows.Scan(
-			&record.Width,
-			&record.Height,
-			&record.MineCount,
-			&record.Unique,
-			&record.Playtime,
-		); err != nil {
-			return nil, err
-		}
-		records = append(records, record)
+	return pgx.CollectRows(rows, pgx.RowToStructByName[GameRecord])
+}
+
+func compilePlayerGameRecords(
+	ctx context.Context, username string,
+) ([]GameRecord, error) {
+	rows, err := pg.db.Query(ctx, `
+	SELECT username 
+		, width
+		, height
+		, mine_count
+		, "unique"
+		, extract(epoch from (ended_at - started_at)) playtime
+	FROM game_session
+	LEFT OUTER JOIN player USING (player_id)
+	WHERE username = $1 AND won = true AND dead = false AND ended_at IS NOT NULL
+	ORDER BY playtime;`, username)
+	if err != nil {
+		return nil, err
 	}
-	return records, nil
+	return pgx.CollectRows(rows, pgx.RowToStructByName[GameRecord])
 }
