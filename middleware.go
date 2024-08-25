@@ -61,7 +61,6 @@ const ctxKeyPlayerClaims ctxKey = iota
 func authMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, err := getJWTFromCookies(r)
-		log.Debug(token, err)
 		if err == nil {
 			claims, err := tryParseJWTCookie(token)
 			if err == nil {
@@ -73,11 +72,11 @@ func authMiddleware(h http.Handler) http.Handler {
 				if token, err := createPlayerToken(
 					claims.PlayerId, claims.Username,
 				); err == nil {
-					setPlayerCookies(w, token)
+					setPlayerCookies(w, r, token)
 				}
 			} else {
 				// clear malformed/expired token
-				clearPlayerCookies(w)
+				clearPlayerCookies(w, r)
 			}
 		}
 		h.ServeHTTP(w, r)

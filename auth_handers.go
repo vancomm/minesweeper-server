@@ -53,7 +53,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		log.Error("unable to sign jwt token: ", err)
 		return
 	}
-	setPlayerCookies(w, token)
+	setPlayerCookies(w, r, token)
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -91,9 +91,9 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		log.Error("unable to sign jwt token: ", err)
 		return
 	}
-	setPlayerCookies(w, token)
+	setPlayerCookies(w, r, token)
 }
 
 func handleLogout(w http.ResponseWriter, r *http.Request) {
-	clearPlayerCookies(w)
+	clearPlayerCookies(w, r)
 }
