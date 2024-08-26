@@ -59,6 +59,16 @@ func createPlayerToken(playerId int, username string) (string, error) {
 	return token.SignedString(jwtPrivateKey)
 }
 
+var sameSite http.SameSite
+
+func init() {
+	if development {
+		sameSite = http.SameSiteNoneMode
+	} else {
+		sameSite = http.SameSiteStrictMode
+	}
+}
+
 func setPlayerCookies(w http.ResponseWriter, token string) {
 	parts := strings.Split(token, ".")
 	header, payload, signature := parts[0], parts[1], parts[2]
@@ -68,7 +78,7 @@ func setPlayerCookies(w http.ResponseWriter, token string) {
 		Value:    header + "." + payload,
 		Secure:   !development,
 		Expires:  time.Now().Add(jwtLifetime),
-		SameSite: http.SameSiteNoneMode,
+		SameSite: sameSite,
 		// Partitioned: true,
 	}
 	httpCookie := http.Cookie{
@@ -77,7 +87,7 @@ func setPlayerCookies(w http.ResponseWriter, token string) {
 		Value:    signature,
 		Secure:   !development,
 		HttpOnly: true,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: sameSite,
 		// Partitioned: true,
 	}
 	http.SetCookie(w, &jsCookie)
@@ -90,7 +100,7 @@ func clearPlayerCookies(w http.ResponseWriter) {
 		Path:     "/",
 		MaxAge:   -1,
 		Secure:   !development,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: sameSite,
 		// Partitioned: true,
 	})
 	http.SetCookie(w, &http.Cookie{
@@ -99,7 +109,7 @@ func clearPlayerCookies(w http.ResponseWriter) {
 		MaxAge:   -1,
 		Secure:   !development,
 		HttpOnly: true,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: sameSite,
 		// Partitioned: true,
 	})
 }
