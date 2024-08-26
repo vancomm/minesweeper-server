@@ -11,6 +11,30 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type PlayerInfo struct {
+	Username string `json:"username"`
+	PlayerId int    `json:"player_id"`
+}
+
+type Status struct {
+	LoggedIn bool        `json:"logged_in"`
+	Player   *PlayerInfo `json:"player,omitempty"`
+}
+
+// This endpoint may be called for the side effect in [authMiddleware] that
+// clears expired auth cookies
+func handleStatus(w http.ResponseWriter, r *http.Request) {
+	var status *Status
+	if claims, ok := r.Context().Value(ctxKeyPlayerClaims).(*PlayerClaims); ok {
+		status = &Status{LoggedIn: true, Player: &PlayerInfo{claims.Username, claims.PlayerId}}
+	} else {
+		status = &Status{LoggedIn: false, Player: nil}
+	}
+	if _, err := sendJSON(w, status); err != nil {
+		log.Error(err)
+	}
+}
+
 func handleRegister(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
@@ -53,7 +77,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		log.Error("unable to sign jwt token: ", err)
 		return
 	}
-	setPlayerCookies(w, r, token)
+	setPlayerCookies(w, token)
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -91,9 +115,9 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		log.Error("unable to sign jwt token: ", err)
 		return
 	}
-	setPlayerCookies(w, r, token)
+	setPlayerCookies(w, token)
 }
 
 func handleLogout(w http.ResponseWriter, r *http.Request) {
-	clearPlayerCookies(w, r)
+	clearPlayerCookies(w)
 }

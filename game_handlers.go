@@ -78,7 +78,7 @@ func handleNewGame(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Error(err)
 	}
-	if err := sendJSON(w, session); err != nil {
+	if _, err := sendJSON(w, session); err != nil {
 		log.Error(err)
 	}
 }
@@ -98,7 +98,7 @@ func handleGetGame(w http.ResponseWriter, r *http.Request) {
 		log.Error(err)
 		return
 	}
-	if err := sendJSON(w, &session); err != nil {
+	if _, err := sendJSON(w, &session); err != nil {
 		log.Error(err)
 	}
 }
@@ -139,7 +139,7 @@ func handleOpen(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
-	if err := sendJSON(w, &session); err != nil {
+	if _, err := sendJSON(w, &session); err != nil {
 		log.Error(err)
 	}
 }
@@ -176,7 +176,7 @@ func handleFlag(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
-	if err := sendJSON(w, &session); err != nil {
+	if _, err := sendJSON(w, &session); err != nil {
 		log.Error(err)
 	}
 }
@@ -217,7 +217,7 @@ func handleChord(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
-	if err := sendJSON(w, &session); err != nil {
+	if _, err := sendJSON(w, &session); err != nil {
 		log.Error(err)
 	}
 }
@@ -247,7 +247,7 @@ func handleReveal(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
-	if err := sendJSON(w, &session); err != nil {
+	if _, err := sendJSON(w, &session); err != nil {
 		log.Error(err)
 	}
 }
@@ -292,7 +292,7 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 				message string
 			}{i, err.Error()}
 			w.WriteHeader(http.StatusBadRequest)
-			if err := sendJSON(w, payload); err != nil {
+			if _, err := sendJSON(w, payload); err != nil {
 				log.Error(err)
 			}
 			return
@@ -309,7 +309,7 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
-	if err := sendJSON(w, &session); err != nil {
+	if _, err := sendJSON(w, &session); err != nil {
 		log.Error(err)
 	}
 }
@@ -321,7 +321,7 @@ func handleRecords(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if err := sendJSON(w, records); err != nil {
+	if _, err := sendJSON(w, records); err != nil {
 		log.Error(err)
 	}
 }
@@ -340,7 +340,7 @@ func handlePlayerRecords(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if err := sendJSON(w, records); err != nil {
+	if _, err := sendJSON(w, records); err != nil {
 		log.Error(err)
 	}
 }

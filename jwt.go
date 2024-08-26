@@ -59,7 +59,7 @@ func createPlayerToken(playerId int, username string) (string, error) {
 	return token.SignedString(jwtPrivateKey)
 }
 
-func setPlayerCookies(w http.ResponseWriter, r *http.Request, token string) {
+func setPlayerCookies(w http.ResponseWriter, token string) {
 	parts := strings.Split(token, ".")
 	header, payload, signature := parts[0], parts[1], parts[2]
 	jsCookie := http.Cookie{
@@ -69,7 +69,6 @@ func setPlayerCookies(w http.ResponseWriter, r *http.Request, token string) {
 		Secure:   !development,
 		Expires:  time.Now().Add(jwtLifetime),
 		SameSite: http.SameSiteNoneMode,
-		Domain:   r.Host,
 		// Partitioned: true,
 	}
 	httpCookie := http.Cookie{
@@ -79,21 +78,19 @@ func setPlayerCookies(w http.ResponseWriter, r *http.Request, token string) {
 		Secure:   !development,
 		HttpOnly: true,
 		SameSite: http.SameSiteNoneMode,
-		Domain:   r.Host,
 		// Partitioned: true,
 	}
 	http.SetCookie(w, &jsCookie)
 	http.SetCookie(w, &httpCookie)
 }
 
-func clearPlayerCookies(w http.ResponseWriter, r *http.Request) {
+func clearPlayerCookies(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth",
 		Path:     "/",
 		MaxAge:   -1,
 		Secure:   !development,
 		SameSite: http.SameSiteNoneMode,
-		Domain:   r.Host,
 		// Partitioned: true,
 	})
 	http.SetCookie(w, &http.Cookie{
@@ -102,7 +99,6 @@ func clearPlayerCookies(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		Secure:   !development,
 		SameSite: http.SameSiteNoneMode,
-		Domain:   r.Host,
 		// Partitioned: true,
 	})
 }

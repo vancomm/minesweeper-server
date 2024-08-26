@@ -22,12 +22,11 @@ func byPiece(s string, sep string) iter.Seq2[int, string] {
 	}
 }
 
-func sendJSON(w http.ResponseWriter, v any) error {
+func sendJSON(w http.ResponseWriter, v any) (int, error) {
 	payload, err := json.Marshal(v)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		return err
+		return 0, err
 	}
-	_, err = w.Write(payload)
-	return err
+	return w.Write(payload)
 }

@@ -33,16 +33,6 @@ func init() {
 
 var pg *postgres
 
-// This endpoint may be called for the side effect in [authMiddleware] that
-// clears expired auth cookies
-func handleStatus(w http.ResponseWriter, r *http.Request) {
-	if claims, ok := r.Context().Value(ctxKeyPlayerClaims).(*PlayerClaims); ok {
-		w.Write([]byte("you are authenticated as " + claims.Username))
-	} else {
-		w.Write([]byte("\"ok\""))
-	}
-}
-
 func main() {
 	flag.Parse()
 	log.Info("starting up")

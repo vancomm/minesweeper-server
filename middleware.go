@@ -72,11 +72,11 @@ func authMiddleware(h http.Handler) http.Handler {
 				if token, err := createPlayerToken(
 					claims.PlayerId, claims.Username,
 				); err == nil {
-					setPlayerCookies(w, r, token)
+					setPlayerCookies(w, token)
 				}
 			} else {
 				// clear malformed/expired token
-				clearPlayerCookies(w, r)
+				clearPlayerCookies(w)
 			}
 		}
 		h.ServeHTTP(w, r)
