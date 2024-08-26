@@ -1,0 +1,9 @@
+*.sqlite
+.git
+.gitignore
+.gitattributes
+.vscode
+compose*.yml
+Dockerfile*
+LICENCE
+README.md

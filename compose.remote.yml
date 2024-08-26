@@ -1,0 +1,36 @@
+name: minesweeper-server-dev
+
+services:
+  server-dev:
+    build:
+      context: .
+      dockerfile: local.Dockerfile
+    container_name: mines-server-dev
+    image: vancomm/mines-server:dev
+    command: >
+      sh -c "tern migrate --migrations migrations &&
+            ./server -port 8001"
+    depends_on:
+      - db-dev
+    ports:
+      - "8001:8001"
+    links:
+      - db-dev
+    env_file:
+      - ./env/remote.env.local
+  
+  db-dev:
+    image: postgres:16.4@sha256:c62fdb7fd6f519ef425c54760894c74e8d0cb04fbf4f7d3d79aafd86bae24edd
+    container_name: mines-db-dev
+    restart: always
+    expose:
+      - 5432
+    ports:
+      - "54320:5432"
+    volumes:
+      - postgres-data-dev:/var/lib/postgresql/data
+    env_file:
+      - ./env/remote.env.local
+
+volumes:
+  postgres-data-dev:

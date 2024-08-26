@@ -3,7 +3,7 @@ services:
   server:
     build:
       context: .
-      dockerfile: Dockerfile.local
+      dockerfile: local.Dockerfile
     image: vancomm/mines-server:dev
     env_file: !override
       - "env/dev.env"
