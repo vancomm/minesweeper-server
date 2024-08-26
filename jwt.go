@@ -75,6 +75,7 @@ func setPlayerCookies(w http.ResponseWriter, token string) {
 	jsCookie := http.Cookie{
 		Name:     "auth",
 		Path:     "/",
+		Domain:   domain,
 		Value:    header + "." + payload,
 		Secure:   !development,
 		Expires:  time.Now().Add(jwtLifetime),
@@ -84,6 +85,7 @@ func setPlayerCookies(w http.ResponseWriter, token string) {
 	httpCookie := http.Cookie{
 		Name:     "sign",
 		Path:     "/",
+		Domain:   domain,
 		Value:    signature,
 		Secure:   !development,
 		HttpOnly: true,
@@ -94,10 +96,22 @@ func setPlayerCookies(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &httpCookie)
 }
 
+func refreshPlayerCookies(w http.ResponseWriter, claims PlayerClaims) error {
+	token, err := createPlayerToken(
+		claims.PlayerId, claims.Username,
+	)
+	if err == nil {
+		setPlayerCookies(w, token)
+	}
+	return err
+}
+
 func clearPlayerCookies(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth",
 		Path:     "/",
+		Domain:   domain,
+		Value:    "delete",
 		MaxAge:   -1,
 		Secure:   !development,
 		SameSite: sameSite,
@@ -106,6 +120,8 @@ func clearPlayerCookies(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sign",
 		Path:     "/",
+		Domain:   domain,
+		Value:    "delete",
 		MaxAge:   -1,
 		Secure:   !development,
 		HttpOnly: true,
@@ -126,13 +142,13 @@ func getJWTFromCookies(r *http.Request) (string, error) {
 	return authCookie.Value + "." + signCookie.Value, nil
 }
 
-func getKey(t *jwt.Token) (interface{}, error) {
+func getPublicKey(t *jwt.Token) (interface{}, error) {
 	return jwtPublicKey, nil
 }
 
 func tryParseJWTCookie(tokenString string) (*PlayerClaims, error) {
 	if token, err := jwt.ParseWithClaims(
-		tokenString, &PlayerClaims{}, getKey,
+		tokenString, &PlayerClaims{}, getPublicKey,
 	); err != nil {
 		return nil, err
 	} else if claims, ok := token.Claims.(*PlayerClaims); ok {

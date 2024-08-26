@@ -60,14 +60,9 @@ const ctxKeyPlayerClaims ctxKey = iota
 
 func authMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var (
-			claims    *PlayerClaims
-			claimsErr error
-		)
-		token, err := getJWTFromCookies(r)
-		if err == nil {
-			claims, claimsErr = tryParseJWTCookie(token)
-			if claimsErr == nil {
+		if token, err := getJWTFromCookies(r); err == nil {
+			claims, err := tryParseJWTCookie(token)
+			if err == nil {
 				ctx := context.WithValue(
 					r.Context(), ctxKeyPlayerClaims, claims,
 				)
@@ -78,27 +73,24 @@ func authMiddleware(h http.Handler) http.Handler {
 			}
 		}
 		h.ServeHTTP(w, r)
-		if w.Header().Get("Set-Cookie") == "" && claims != nil && claimsErr == nil {
-			// refresh token expiry
-			if token, err := createPlayerToken(
-				claims.PlayerId, claims.Username,
-			); err == nil {
-				setPlayerCookies(w, token)
-			}
-		}
 	})
 }
 
-var corsMiddleware = cors.New(cors.Options{
-	AllowOriginFunc: func(origin string) bool { return true }, // HACK f*ck you cors!!!
-	AllowedMethods: []string{
-		http.MethodHead,
-		http.MethodGet,
-		http.MethodPost,
-		http.MethodPut,
-		http.MethodPatch,
-		http.MethodDelete,
-	},
-	AllowedHeaders:   []string{"*"},
-	AllowCredentials: true,
-}).Handler
+func corsMiddleware(h http.Handler) http.Handler {
+	options := cors.Options{
+		AllowOriginFunc: func(origin string) bool {
+			return true // HACK f*ck you cors!!!
+		},
+		AllowedMethods: []string{
+			http.MethodHead,
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodPatch,
+			http.MethodDelete,
+		},
+		AllowedHeaders:   []string{"*"},
+		AllowCredentials: true,
+	}
+	return cors.New(options).Handler(h)
+}

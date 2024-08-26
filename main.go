@@ -11,7 +11,19 @@ import (
 	"github.com/vancomm/minesweeper-server/mines"
 )
 
-var _, development = os.LookupEnv("DEVELOPMENT")
+var (
+	_, development = os.LookupEnv("DEVELOPMENT")
+	domain         = os.Getenv("DOMAIN")
+	mode           string
+)
+
+func init() {
+	if development {
+		mode = "development"
+	} else {
+		mode = "production"
+	}
+}
 
 var port int
 
@@ -35,7 +47,7 @@ var pg *postgres
 
 func main() {
 	flag.Parse()
-	log.Info("starting up")
+	log.Info("starting up, mode = ", mode)
 
 	dbUrl := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s",
 		os.Getenv("DB_HOST"),

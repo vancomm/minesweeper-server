@@ -27,6 +27,7 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	var status *Status
 	if claims, ok := r.Context().Value(ctxKeyPlayerClaims).(*PlayerClaims); ok {
 		status = &Status{LoggedIn: true, Player: &PlayerInfo{claims.Username, claims.PlayerId}}
+		refreshPlayerCookies(w, *claims)
 	} else {
 		status = &Status{LoggedIn: false, Player: nil}
 	}

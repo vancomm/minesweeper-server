@@ -70,6 +70,7 @@ func handleNewGame(w http.ResponseWriter, r *http.Request) {
 		session, err = pg.CreatePlayerGameSession(
 			context.Background(), claims.PlayerId, game,
 		)
+		refreshPlayerCookies(w, *claims)
 	} else {
 		log.Debug("creating anonymous session")
 		session, err = pg.CreateAnonymousGameSession(context.Background(), game)
