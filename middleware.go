@@ -60,26 +60,32 @@ const ctxKeyPlayerClaims ctxKey = iota
 
 func authMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var (
+			claims    *PlayerClaims
+			claimsErr error
+		)
 		token, err := getJWTFromCookies(r)
 		if err == nil {
-			claims, err := tryParseJWTCookie(token)
-			if err == nil {
+			claims, claimsErr = tryParseJWTCookie(token)
+			if claimsErr == nil {
 				ctx := context.WithValue(
 					r.Context(), ctxKeyPlayerClaims, claims,
 				)
 				r = r.WithContext(ctx)
-				// refresh token expiry
-				if token, err := createPlayerToken(
-					claims.PlayerId, claims.Username,
-				); err == nil {
-					setPlayerCookies(w, token)
-				}
 			} else {
 				// clear malformed/expired token
 				clearPlayerCookies(w)
 			}
 		}
 		h.ServeHTTP(w, r)
+		if w.Header().Get("Set-Cookie") == "" && claims != nil && claimsErr == nil {
+			// refresh token expiry
+			if token, err := createPlayerToken(
+				claims.PlayerId, claims.Username,
+			); err == nil {
+				setPlayerCookies(w, token)
+			}
+		}
 	})
 }
 

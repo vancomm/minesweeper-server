@@ -98,6 +98,7 @@ func clearPlayerCookies(w http.ResponseWriter) {
 		Path:     "/",
 		MaxAge:   -1,
 		Secure:   !development,
+		HttpOnly: true,
 		SameSite: http.SameSiteNoneMode,
 		// Partitioned: true,
 	})
