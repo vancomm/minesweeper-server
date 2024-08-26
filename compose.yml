@@ -27,11 +27,5 @@ services:
     env_file:
       - prod.env
 
-  watchtower:
-    image: containrrr/watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: -i 3600 mines-server
-
 volumes:
   postgres-data:
