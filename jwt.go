@@ -11,10 +11,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// ssh-keygen -t rsa -m pem -f jwt-private-key.pem
+// openssl rsa -in jwt-private-key.pem -pubout -out jwt-public-key.pem
+
 var (
-	// ssh-keygen -t rsa -m pem -f jwt-private-key.pem
-	jwtPrivateKey *rsa.PrivateKey
-	// openssl rsa -in jwt-private-key.pem -pubout -out jwt-public-key.pem
+	jwtPrivateKey    *rsa.PrivateKey
 	jwtPublicKey     *rsa.PublicKey
 	jwtSigningMethod               = jwt.GetSigningMethod("RS256")
 	jwtLifetime      time.Duration = 24 * time.Hour
@@ -55,8 +56,10 @@ func createPlayerToken(playerId int, username string) (string, error) {
 			NotBefore: jwt.NewNumericDate(time.Now()),
 		},
 	}
-	token := jwt.NewWithClaims(jwtSigningMethod, claims)
-	return token.SignedString(jwtPrivateKey)
+	token, err := jwt.NewWithClaims(jwtSigningMethod, claims).
+		SignedString(jwtPrivateKey)
+	log.Debug("created new token: ", token)
+	return token, err
 }
 
 var sameSite http.SameSite
@@ -72,7 +75,7 @@ func init() {
 func setPlayerCookies(w http.ResponseWriter, token string) {
 	parts := strings.Split(token, ".")
 	header, payload, signature := parts[0], parts[1], parts[2]
-	jsCookie := http.Cookie{
+	jsCookie := &http.Cookie{
 		Name:     "auth",
 		Path:     "/",
 		Domain:   domain,
@@ -82,7 +85,7 @@ func setPlayerCookies(w http.ResponseWriter, token string) {
 		SameSite: sameSite,
 		// Partitioned: true,
 	}
-	httpCookie := http.Cookie{
+	httpCookie := &http.Cookie{
 		Name:     "sign",
 		Path:     "/",
 		Domain:   domain,
@@ -92,8 +95,8 @@ func setPlayerCookies(w http.ResponseWriter, token string) {
 		SameSite: sameSite,
 		// Partitioned: true,
 	}
-	http.SetCookie(w, &jsCookie)
-	http.SetCookie(w, &httpCookie)
+	http.SetCookie(w, jsCookie)
+	http.SetCookie(w, httpCookie)
 }
 
 func refreshPlayerCookies(w http.ResponseWriter, claims PlayerClaims) error {

@@ -69,6 +69,7 @@ func authMiddleware(h http.Handler) http.Handler {
 				r = r.WithContext(ctx)
 			} else {
 				// clear malformed/expired token
+				log.Debug("unable to parse token: ", token, err)
 				clearPlayerCookies(w)
 			}
 		}
