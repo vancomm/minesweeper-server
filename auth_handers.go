@@ -30,6 +30,7 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 		refreshPlayerCookies(w, *claims)
 	} else {
 		status = &Status{LoggedIn: false, Player: nil}
+		clearPlayerCookies(w)
 	}
 	if _, err := sendJSON(w, status); err != nil {
 		log.Error(err)
