@@ -10,10 +10,10 @@ import (
 	"github.com/rs/cors"
 )
 
-type Middleware func(http.Handler) http.Handler
-
-func useMiddleware(s *http.ServeMux, mws ...Middleware) http.Handler {
-	var h http.Handler = s
+func useMiddleware(
+	h http.Handler,
+	mws ...func(http.Handler) http.Handler,
+) http.Handler {
 	for _, mw := range mws {
 		h = mw(h)
 	}
@@ -54,23 +54,22 @@ func loggingMiddleware(h http.Handler) http.Handler {
 	})
 }
 
-type ctxKey int
+type requestCtxKey int
 
-const ctxKeyPlayerClaims ctxKey = iota
+const (
+	ctxPlayerClaims requestCtxKey = iota
+)
 
 func authMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if token, err := getJWTFromCookies(r); err == nil {
+		if token, err := getJWTFromCookies(r); err != nil {
+			// clear malformed/expired token
+			clearPlayerCookies(w)
+		} else {
 			claims, err := tryParseJWTCookie(token)
 			if err == nil {
-				ctx := context.WithValue(
-					r.Context(), ctxKeyPlayerClaims, claims,
-				)
+				ctx := context.WithValue(r.Context(), ctxPlayerClaims, claims)
 				r = r.WithContext(ctx)
-			} else {
-				// clear malformed/expired token
-				log.Debug("unable to parse token: ", token, err)
-				clearPlayerCookies(w)
 			}
 		}
 		h.ServeHTTP(w, r)

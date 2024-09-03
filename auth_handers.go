@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
@@ -25,7 +24,7 @@ type Status struct {
 // clears expired auth cookies
 func handleStatus(w http.ResponseWriter, r *http.Request) {
 	var status *Status
-	if claims, ok := r.Context().Value(ctxKeyPlayerClaims).(*PlayerClaims); ok {
+	if claims, ok := r.Context().Value(ctxPlayerClaims).(*PlayerClaims); ok {
 		status = &Status{LoggedIn: true, Player: &PlayerInfo{claims.Username, claims.PlayerId}}
 		refreshPlayerCookies(w, *claims)
 	} else {
@@ -62,7 +61,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		log.Error(err)
 		return
 	}
-	player, err := pg.CreatePlayer(context.Background(), username, hash)
+	player, err := pg.CreatePlayer(r.Context(), username, hash)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
 		w.WriteHeader(http.StatusConflict)
@@ -95,7 +94,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("body must contain url-encoded username and password"))
 		return
 	}
-	player, err := pg.GetPlayer(context.Background(), username)
+	player, err := pg.GetPlayer(r.Context(), username)
 	if errors.Is(err, pgx.ErrNoRows) {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("username unknown"))

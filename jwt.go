@@ -1,44 +1,15 @@
 package main
 
 import (
-	"crypto/rsa"
 	"errors"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// ssh-keygen -t rsa -m pem -f jwt-private-key.pem
-// openssl rsa -in jwt-private-key.pem -pubout -out jwt-public-key.pem
-
-var (
-	jwtPrivateKey    *rsa.PrivateKey
-	jwtPublicKey     *rsa.PublicKey
-	jwtSigningMethod               = jwt.GetSigningMethod("RS256")
-	jwtLifetime      time.Duration = 24 * time.Hour
-)
-
-func init() {
-	pvtKeyBytes, err := os.ReadFile("./secrets/jwt-private-key.pem")
-	if err != nil {
-		log.Fatal("unable to read JWT private key: ", err)
-	}
-	jwtPrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM(pvtKeyBytes)
-	if err != nil {
-		log.Fatal("unable to parse JWT private key: ", err)
-	}
-	pubKeyBytes, err := os.ReadFile("./secrets/jwt-public-key.pem")
-	if err != nil {
-		log.Fatal("unable to read JWT public key: ", err)
-	}
-	jwtPublicKey, err = jwt.ParseRSAPublicKeyFromPEM(pubKeyBytes)
-	if err != nil {
-		log.Fatal("unable to parse JWT public key: ", err)
-	}
-}
+var jwtSigningMethod = jwt.GetSigningMethod("RS256")
 
 type PlayerClaims struct {
 	PlayerId int    `json:"player_id"`
@@ -51,7 +22,7 @@ func createPlayerToken(playerId int, username string) (string, error) {
 		playerId,
 		username,
 		jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(jwtLifetime)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(config.Jwt.TokenLifetime.Duration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 		},
@@ -62,37 +33,28 @@ func createPlayerToken(playerId int, username string) (string, error) {
 	return token, err
 }
 
-var sameSite http.SameSite
-
-func init() {
-	if development {
-		sameSite = http.SameSiteNoneMode
-	} else {
-		sameSite = http.SameSiteStrictMode
-	}
-}
-
 func setPlayerCookies(w http.ResponseWriter, token string) {
 	parts := strings.Split(token, ".")
 	header, payload, signature := parts[0], parts[1], parts[2]
 	jsCookie := &http.Cookie{
 		Name:     "auth",
 		Path:     "/",
-		Domain:   domain,
+		Domain:   config.Domain,
 		Value:    header + "." + payload,
-		Secure:   !development,
-		Expires:  time.Now().Add(jwtLifetime),
-		SameSite: sameSite,
+		Secure:   config.Production(),
+		Expires:  time.Now().Add(config.Jwt.TokenLifetime.Duration),
+		SameSite: config.HttpCookieSameSite(),
 		// Partitioned: true,
 	}
 	httpCookie := &http.Cookie{
 		Name:     "sign",
 		Path:     "/",
-		Domain:   domain,
+		Domain:   config.Domain,
 		Value:    signature,
-		Secure:   !development,
+		Secure:   config.Production(),
 		HttpOnly: true,
-		SameSite: sameSite,
+		Expires:  time.Now().Add(config.Jwt.TokenLifetime.Duration),
+		SameSite: config.HttpCookieSameSite(),
 		// Partitioned: true,
 	}
 	http.SetCookie(w, jsCookie)
@@ -113,22 +75,22 @@ func clearPlayerCookies(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth",
 		Path:     "/",
-		Domain:   domain,
+		Domain:   config.Domain,
 		Value:    "delete",
 		MaxAge:   -1,
-		Secure:   !development,
-		SameSite: sameSite,
+		Secure:   config.Production(),
+		SameSite: config.HttpCookieSameSite(),
 		// Partitioned: true,
 	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sign",
 		Path:     "/",
-		Domain:   domain,
+		Domain:   config.Domain,
 		Value:    "delete",
 		MaxAge:   -1,
-		Secure:   !development,
+		Secure:   config.Production(),
 		HttpOnly: true,
-		SameSite: sameSite,
+		SameSite: config.HttpCookieSameSite(),
 		// Partitioned: true,
 	})
 }

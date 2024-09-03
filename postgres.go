@@ -17,11 +17,11 @@ type postgres struct {
 }
 
 func NewPostgres(ctx context.Context, dbUrl string) (*postgres, error) {
-	config, err := pgxpool.ParseConfig(dbUrl)
+	poolConfig, err := pgxpool.ParseConfig(dbUrl)
 	if err != nil {
 		return nil, err
 	}
-	db, err := pgxpool.NewWithConfig(ctx, config)
+	db, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return nil, err
 	}

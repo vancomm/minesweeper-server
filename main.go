@@ -2,69 +2,132 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"flag"
-	"fmt"
+	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/sirupsen/logrus"
-	"github.com/vancomm/minesweeper-server/mines"
+	"github.com/snowzach/rotatefilehook"
+	"golang.org/x/sync/errgroup"
 )
-
-var (
-	_, development = os.LookupEnv("DEVELOPMENT")
-	domain         = os.Getenv("DOMAIN")
-	mode           string
-)
-
-func init() {
-	if development {
-		mode = "development"
-	} else {
-		mode = "production"
-	}
-}
-
-var port int
-
-func init() {
-	const (
-		defaultPort = 8000
-		usage       = "listening port"
-	)
-	flag.IntVar(&port, "port", defaultPort, usage)
-	flag.IntVar(&port, "p", defaultPort, usage+" (shorthand)")
-}
 
 var log = logrus.New()
 
+var (
+	configPath string
+	config     Config
+)
+
 func init() {
-	log.SetLevel(logrus.DebugLevel)
-	mines.Log.SetLevel(logrus.DebugLevel)
+	const (
+		defaultConfigPath = "./config.json"
+		usage             = "config file path"
+	)
+	flag.StringVar(&configPath, "config", defaultConfigPath, usage)
+	flag.StringVar(&configPath, "c", defaultConfigPath, usage+" (shorthand)")
+}
+
+var logPath string
+
+func init() {
+	const (
+		defaultLogPath = "./log.jsonl"
+		usage          = "log file path"
+	)
+	flag.StringVar(&logPath, "log-file", defaultLogPath, usage)
+	flag.StringVar(&logPath, "l", defaultLogPath, usage+" (shorthand)")
+}
+
+func setupLogging() {
+	logLevel := logrus.InfoLevel
+	if config.Development() {
+		logLevel = logrus.DebugLevel
+	}
+	log.SetLevel(logLevel)
+
+	log.SetFormatter(&logrus.TextFormatter{ForceColors: true})
+
+	if hook, err := rotatefilehook.NewRotateFileHook(
+		rotatefilehook.RotateFileConfig{
+			Filename:   logPath,
+			MaxSize:    5,
+			MaxBackups: 7,
+			MaxAge:     28,
+			Level:      logLevel,
+			Formatter:  &logrus.JSONFormatter{},
+		}); err != nil {
+		log.Fatal("unable to set set up rotating file logger: ", err)
+	} else {
+		log.Hooks.Add(hook)
+	}
 }
 
 var pg *postgres
 
-func main() {
-	flag.Parse()
-	log.Info("starting up, mode = ", mode)
-
-	dbUrl := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s",
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("POSTGRES_USER"),
-		os.Getenv("POSTGRES_PASSWORD"),
-		os.Getenv("POSTGRES_DB"),
-	)
+func setupPostgres(ctx context.Context) {
 	var err error
-	pg, err = NewPostgres(context.Background(), dbUrl)
+	pg, err = NewPostgres(ctx, config.Postgres.DbUrl())
 	if err != nil {
 		log.Fatal("unable to create connection pool: ", err)
 	}
-	defer pg.Close()
-	if err := pg.Ping(context.Background()); err != nil {
+	if err := pg.Ping(ctx); err != nil {
 		log.Fatal("unable to ping database: ", err)
 	}
+}
+
+// ssh-keygen -t rsa -m pem -f jwt-private-key.pem
+// openssl rsa -in jwt-private-key.pem -pubout -out jwt-public-key.pem
+
+var (
+	jwtPrivateKey *rsa.PrivateKey
+	jwtPublicKey  *rsa.PublicKey
+)
+
+func setupJwtKeys() {
+	privateKeyBytes, err := os.ReadFile(config.Jwt.PrivateKeyPath)
+	if err != nil {
+		log.Fatal("unable to read JWT private key: ", err)
+	}
+	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
+	if err != nil {
+		log.Fatal("unable to parse JWT private key: ", err)
+	}
+	publicKeyBytes, err := os.ReadFile(config.Jwt.PublicKeyPath)
+	if err != nil {
+		log.Fatal("unable to read JWT public key: ", err)
+	}
+	publicKey, err := jwt.ParseRSAPublicKeyFromPEM(publicKeyBytes)
+	if err != nil {
+		log.Fatal("unable to parse JWT public key: ", err)
+	}
+	jwtPrivateKey = privateKey
+	jwtPublicKey = publicKey
+}
+
+func main() {
+	mainCtx, stop := signal.NotifyContext(context.Background(),
+		os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	flag.Parse()
+
+	if err := ReadConfig(configPath, &config); err != nil {
+		log.Fatalf("unable to read config from %s: %s", configPath, err.Error())
+	}
+
+	setupLogging()
+
+	log.WithFields(config.Fields()).Debug("config")
+	log.Info("starting up, mode = ", config.Mode)
+
+	setupJwtKeys()
+	setupPostgres(mainCtx)
+	defer pg.Close()
 
 	mux := http.NewServeMux()
 
@@ -86,16 +149,32 @@ func main() {
 
 	mux.HandleFunc("/v1/game/{id}/connect", handleConnectWs)
 
-	h := useMiddleware(mux,
+	handler := useMiddleware(mux,
 		corsMiddleware,
 		authMiddleware,
 		loggingMiddleware,
-		// cors.AllowAll().Handler,
-		// corsMiddleware,
 	)
 
-	addr := fmt.Sprintf("0.0.0.0:%d", port)
-	log.Infof("ready to serve @ %s", addr)
+	server := &http.Server{
+		Addr:    config.Addr,
+		Handler: handler,
+		BaseContext: func(l net.Listener) context.Context {
+			return mainCtx
+		},
+	}
 
-	log.Fatal(http.ListenAndServe(addr, h))
+	log.Infof("ready to serve @ %s", config.Addr)
+
+	g, gCtx := errgroup.WithContext(mainCtx)
+	g.Go(func() error {
+		return server.ListenAndServe()
+	})
+	g.Go(func() error {
+		<-gCtx.Done()
+		return server.Shutdown(context.Background())
+	})
+
+	if err := g.Wait(); err != nil {
+		log.Printf("exit reason: %s\n", err)
+	}
 }

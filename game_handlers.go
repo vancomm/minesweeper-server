@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"hash/maphash"
 	"io"
 	"math/rand/v2"
@@ -65,15 +64,15 @@ func handleNewGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var session *GameSession
-	if claims, ok := r.Context().Value(ctxKeyPlayerClaims).(*PlayerClaims); ok {
+	if claims, ok := r.Context().Value(ctxPlayerClaims).(*PlayerClaims); ok {
 		log.Debug("creating session for player ", claims.Username)
 		session, err = pg.CreatePlayerGameSession(
-			context.Background(), claims.PlayerId, game,
+			r.Context(), claims.PlayerId, game,
 		)
 		refreshPlayerCookies(w, *claims)
 	} else {
 		log.Debug("creating anonymous session")
-		session, err = pg.CreateAnonymousGameSession(context.Background(), game)
+		session, err = pg.CreateAnonymousGameSession(r.Context(), game)
 	}
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -90,7 +89,7 @@ func handleGetGame(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	session, err := pg.GetSession(context.Background(), sessionId)
+	session, err := pg.GetSession(r.Context(), sessionId)
 	if err == pgx.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -116,7 +115,7 @@ func handleOpen(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	session, err := pg.GetSession(context.Background(), sessionId)
+	session, err := pg.GetSession(r.Context(), sessionId)
 	if err == pgx.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -134,9 +133,7 @@ func handleOpen(w http.ResponseWriter, r *http.Request) {
 		session.State.RevealMines()
 		session.EndedAt = time.Now().UTC()
 	}
-	if err := pg.UpdateGameSession(
-		context.Background(), session,
-	); err != nil {
+	if err := pg.UpdateGameSession(r.Context(), session); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
@@ -157,7 +154,7 @@ func handleFlag(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	session, err := pg.GetSession(context.Background(), sessionId)
+	session, err := pg.GetSession(r.Context(), sessionId)
 	if err == pgx.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -171,9 +168,7 @@ func handleFlag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session.State.FlagSquare(posParams.X, posParams.Y)
-	if err := pg.UpdateGameSession(
-		context.Background(), session,
-	); err != nil {
+	if err := pg.UpdateGameSession(r.Context(), session); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
@@ -194,7 +189,7 @@ func handleChord(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	session, err := pg.GetSession(context.Background(), sessionId)
+	session, err := pg.GetSession(r.Context(), sessionId)
 	if err == pgx.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -212,9 +207,7 @@ func handleChord(w http.ResponseWriter, r *http.Request) {
 		session.State.RevealMines()
 		session.EndedAt = time.Now().UTC()
 	}
-	if err := pg.UpdateGameSession(
-		context.Background(), session,
-	); err != nil {
+	if err := pg.UpdateGameSession(r.Context(), session); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
@@ -229,7 +222,7 @@ func handleReveal(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	session, err := pg.GetSession(context.Background(), sessionId)
+	session, err := pg.GetSession(r.Context(), sessionId)
 	if err == pgx.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -242,9 +235,7 @@ func handleReveal(w http.ResponseWriter, r *http.Request) {
 	if session.EndedAt.IsZero() {
 		session.EndedAt = time.Now().UTC()
 	}
-	if err := pg.UpdateGameSession(
-		context.Background(), session,
-	); err != nil {
+	if err := pg.UpdateGameSession(r.Context(), session); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
@@ -270,7 +261,7 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	session, err := pg.GetSession(context.Background(), sessionId)
+	session, err := pg.GetSession(r.Context(), sessionId)
 	if err == pgx.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -304,9 +295,7 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	if err := pg.UpdateGameSession(
-		context.Background(), session,
-	); err != nil {
+	if err := pg.UpdateGameSession(r.Context(), session); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatal(err)
 	}
@@ -316,7 +305,7 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRecords(w http.ResponseWriter, r *http.Request) {
-	records, err := compileGameRecords(context.Background())
+	records, err := compileGameRecords(r.Context())
 	if err != nil {
 		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -328,14 +317,12 @@ func handleRecords(w http.ResponseWriter, r *http.Request) {
 }
 
 func handlePlayerRecords(w http.ResponseWriter, r *http.Request) {
-	claims, ok := r.Context().Value(ctxKeyPlayerClaims).(*PlayerClaims)
+	claims, ok := r.Context().Value(ctxPlayerClaims).(*PlayerClaims)
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	records, err := compilePlayerGameRecords(
-		context.Background(), claims.Username,
-	)
+	records, err := compilePlayerGameRecords(r.Context(), claims.Username)
 	if err != nil {
 		log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
