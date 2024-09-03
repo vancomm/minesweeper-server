@@ -1,15 +1,42 @@
-# this config is meant to override docker-compose.yml
 services:
   server:
     build:
       context: .
       dockerfile: local.Dockerfile
+    container_name: mines-server
     image: vancomm/mines-server:dev
-    env_file: !override
-      - "env/dev.env"
+    command: >
+      sh -c "tern migrate --migrations migrations &&
+            ./server -config /app/config/dev-config.json -log-file /app/log/log.jsonl"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    links:
+      - db
+    env_file:
+      - ./config/dev.env
+    volumes:
+      - ./secrets:/app/secrets:ro
+      - ./config:/app/config:ro
+      - ./log:/app/log:rw
   
   db:
+    image: postgres:16.4@sha256:c62fdb7fd6f519ef425c54760894c74e8d0cb04fbf4f7d3d79aafd86bae24edd
+    container_name: mines-db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U $$POSTGRES_USER -d $$POSTGRES_DB -c 'select 1' || exit 1"]
+      interval: 5s
+      timeout: 30s
+      retries: 5
     ports:
       - "54320:5432"
-    env_file: !override
-      - "env/dev.env"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    env_file:
+      - ./config/dev.env
+
+volumes:
+  postgres-data:

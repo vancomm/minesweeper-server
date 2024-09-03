@@ -1,0 +1,46 @@
+name: minesweeper-server-dev
+
+services:
+  server-staging:
+    build:
+      context: .
+      dockerfile: local.Dockerfile
+    image: vancomm/mines-server:staging
+    container_name: mines-server-staging
+    command: >
+      sh -c "tern migrate --migrations migrations &&
+            ./server -config /app/config/staging-config.json -log-file /app/log/staging-log.jsonl"
+    depends_on:
+      db-staging:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+    links:
+      - db-staging
+    env_file:
+      - ./remote-files.local/staging.env
+    volumes:
+      - /var/lib/minesweeper/staging-secrets:/app/secrets:ro
+      - /var/lib/minesweeper/config:/app/config:ro
+      - /var/log/minesweeper:/app/log:rw
+  
+  db-staging:
+    image: postgres:16.4@sha256:c62fdb7fd6f519ef425c54760894c74e8d0cb04fbf4f7d3d79aafd86bae24edd
+    container_name: mines-db-staging
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U $$POSTGRES_USER -d $$POSTGRES_DB -c 'select 1' || exit 1"]
+      interval: 5s
+      timeout: 30s
+      retries: 5
+    expose:
+      - 5432
+    ports:
+      - "54320:5432"
+    volumes:
+      - postgres-data-staging:/var/lib/postgresql/data
+    env_file:
+      - ./remote-files.local/staging.env
+
+volumes:
+  postgres-data-staging:

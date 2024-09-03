@@ -4,28 +4,36 @@ services:
     container_name: mines-server
     command: >
       sh -c "tern migrate --migrations migrations &&
-            ./server -port 8000"
+            ./server -config /app/config/config.json -log-file /app/log/log.jsonl"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "8000:8000"
     links:
       - db
     env_file:
-      - prod.env
+      - /var/lib/minesweeper/prod.env
     volumes:
-      - ./secrets:/app/secrets
+      - /var/lib/minesweeper/secrets:/app/secrets:ro
+      - /var/lib/minesweeper/config:/app/config:ro
+      - /var/log/minesweeper:/app/log:rw
   
   db:
     image: postgres:16.4@sha256:c62fdb7fd6f519ef425c54760894c74e8d0cb04fbf4f7d3d79aafd86bae24edd
     container_name: mines-db
-    restart: always
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U $$POSTGRES_USER -d $$POSTGRES_DB -c 'select 1' || exit 1"]
+      interval: 5s
+      timeout: 30s
+      retries: 5
     expose:
       - 5432
     volumes:
       - postgres-data:/var/lib/postgresql/data
     env_file:
-      - prod.env
+      - /var/lib/minesweeper/prod.env
 
 volumes:
   postgres-data:
