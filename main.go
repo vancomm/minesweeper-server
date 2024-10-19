@@ -110,8 +110,10 @@ func setupJwtKeys() {
 }
 
 func main() {
-	mainCtx, stop := signal.NotifyContext(context.Background(),
-		os.Interrupt, syscall.SIGTERM)
+	mainCtx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt, syscall.SIGTERM,
+	)
 	defer stop()
 
 	flag.Parse()
@@ -129,35 +131,9 @@ func main() {
 	setupPostgres(mainCtx)
 	defer pg.Close()
 
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("POST /v1/register", handleRegister)
-	mux.HandleFunc("POST /v1/login", handleLogin)
-	mux.HandleFunc("POST /v1/logout", handleLogout)
-
-	mux.HandleFunc("GET /v1/status", handleStatus)
-	mux.HandleFunc("GET /v1/records", handleRecords)
-	mux.HandleFunc("GET /v1/myrecords", handlePlayerRecords)
-
-	mux.HandleFunc("POST /v1/game", handleNewGame)
-	mux.HandleFunc("GET /v1/game/{id}", handleGetGame)
-	mux.HandleFunc("POST /v1/game/{id}/open", handleOpen)
-	mux.HandleFunc("POST /v1/game/{id}/flag", handleFlag)
-	mux.HandleFunc("POST /v1/game/{id}/chord", handleChord)
-	mux.HandleFunc("POST /v1/game/{id}/reveal", handleReveal)
-	mux.HandleFunc("POST /v1/game/{id}/batch", handleBatch)
-
-	mux.HandleFunc("/v1/game/{id}/connect", handleConnectWs)
-
-	handler := useMiddleware(mux,
-		corsMiddleware,
-		authMiddleware,
-		loggingMiddleware,
-	)
-
 	server := &http.Server{
 		Addr:    config.Addr,
-		Handler: handler,
+		Handler: buildHandler(),
 		BaseContext: func(l net.Listener) context.Context {
 			return mainCtx
 		},

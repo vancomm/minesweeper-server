@@ -64,10 +64,12 @@ func authMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if token, err := getJWTFromCookies(r); err != nil {
 			// clear malformed/expired token
+			log.Debug("received malformed token - clear cookies")
 			clearPlayerCookies(w)
 		} else {
 			claims, err := tryParseJWTCookie(token)
 			if err == nil {
+				log.Debug("authorized as " + claims.Username)
 				ctx := context.WithValue(r.Context(), ctxPlayerClaims, claims)
 				r = r.WithContext(ctx)
 			}

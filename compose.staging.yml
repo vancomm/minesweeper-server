@@ -18,7 +18,7 @@ services:
     links:
       - db-staging
     env_file:
-      - ./remote-files.local/staging.env
+      - ./config/staging.env.local
     volumes:
       - /var/lib/minesweeper/staging-secrets:/app/secrets:ro
       - /var/lib/minesweeper/config:/app/config:ro
@@ -40,7 +40,7 @@ services:
     volumes:
       - postgres-data-staging:/var/lib/postgresql/data
     env_file:
-      - ./remote-files.local/staging.env
+      - ./config/staging.env.local
 
 volumes:
   postgres-data-staging:

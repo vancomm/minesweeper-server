@@ -22,14 +22,15 @@ func createPlayerToken(playerId int, username string) (string, error) {
 		playerId,
 		username,
 		jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(config.Jwt.TokenLifetime.Duration)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(
+				config.Jwt.TokenLifetime.Duration),
+			),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 		},
 	}
 	token, err := jwt.NewWithClaims(jwtSigningMethod, claims).
 		SignedString(jwtPrivateKey)
-	log.Debug("created new token: ", token)
 	return token, err
 }
 

@@ -32,7 +32,7 @@ type GameSessionJSON struct {
 func (s GameSession) MarshalJSON() ([]byte, error) {
 	var endedAt *int64
 	if !s.EndedAt.IsZero() {
-		e := s.EndedAt.Unix()
+		e := s.EndedAt.UnixMilli()
 		endedAt = &e
 	}
 	return json.Marshal(GameSessionJSON{
@@ -44,7 +44,7 @@ func (s GameSession) MarshalJSON() ([]byte, error) {
 		Unique:    s.State.Unique,
 		Dead:      s.State.Dead,
 		Won:       s.State.Won,
-		StartedAt: s.StartedAt.Unix(),
+		StartedAt: s.StartedAt.UnixMilli(),
 		EndedAt:   endedAt,
 	})
 }

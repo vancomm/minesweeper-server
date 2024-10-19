@@ -303,32 +303,3 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 		log.Error(err)
 	}
 }
-
-func handleRecords(w http.ResponseWriter, r *http.Request) {
-	records, err := compileGameRecords(r.Context())
-	if err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	if _, err := sendJSON(w, records); err != nil {
-		log.Error(err)
-	}
-}
-
-func handlePlayerRecords(w http.ResponseWriter, r *http.Request) {
-	claims, ok := r.Context().Value(ctxPlayerClaims).(*PlayerClaims)
-	if !ok {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	records, err := compilePlayerGameRecords(r.Context(), claims.Username)
-	if err != nil {
-		log.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	if _, err := sendJSON(w, records); err != nil {
-		log.Error(err)
-	}
-}

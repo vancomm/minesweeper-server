@@ -5,6 +5,7 @@ package mines
 import (
 	"fmt"
 	"math/rand/v2"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -16,6 +17,31 @@ import (
 type GameParams struct {
 	Width, Height, MineCount int
 	Unique                   bool
+}
+
+func (p GameParams) Seed() string {
+	u := 0
+	if p.Unique {
+		u = 1
+	}
+	return fmt.Sprintf("%d:%d:%d:%d", p.Width, p.Height, p.MineCount, u)
+}
+
+func ParseGameParams(seed string) (*GameParams, error) {
+	p := &GameParams{}
+	u := 0
+	sseed := strings.ReplaceAll(seed, ":", " ")
+	n, err := fmt.Sscanf(
+		sseed, "%d %d %d %d", &p.Width, &p.Height, &p.MineCount, &u,
+	)
+	if n != 4 || err != nil {
+		return nil, fmt.Errorf(
+			`invalid game params seed (sseed = "%s", n = %d, err = %w)`,
+			sseed, n, err,
+		)
+	}
+	p.Unique = u == 1
+	return p, nil
 }
 
 func (p GameParams) ValidateSquare(x, y int) bool {

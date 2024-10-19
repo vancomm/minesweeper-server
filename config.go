@@ -93,7 +93,7 @@ func (c Config) Development() bool {
 
 func (c Config) HttpCookieSameSite() http.SameSite {
 	if c.Development() {
-		return http.SameSiteNoneMode
+		return http.SameSiteLaxMode
 	} else {
 		return http.SameSiteStrictMode
 	}

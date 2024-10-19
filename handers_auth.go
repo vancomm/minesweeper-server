@@ -25,10 +25,15 @@ type Status struct {
 func handleStatus(w http.ResponseWriter, r *http.Request) {
 	var status *Status
 	if claims, ok := r.Context().Value(ctxPlayerClaims).(*PlayerClaims); ok {
-		status = &Status{LoggedIn: true, Player: &PlayerInfo{claims.Username, claims.PlayerId}}
+		status = &Status{
+			LoggedIn: true,
+			Player:   &PlayerInfo{claims.Username, claims.PlayerId},
+		}
+		log.Debug("refresh cookies")
 		refreshPlayerCookies(w, *claims)
 	} else {
 		status = &Status{LoggedIn: false, Player: nil}
+		log.Debug("could not parse cookies - clear cookies")
 		clearPlayerCookies(w)
 	}
 	if _, err := sendJSON(w, status); err != nil {
