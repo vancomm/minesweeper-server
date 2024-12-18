@@ -1,2 +1,6 @@
-#!/bin/sh -x
-docker context create remote --docker "host=ssh://root@mskbox"
+#!/bin/sh -xeu
+
+CONTEXT_NAME=remote
+REMOTE_HOST=mskbox
+
+docker context create $CONTEXT_NAME --docker "host=ssh://root@$REMOTE_HOST"

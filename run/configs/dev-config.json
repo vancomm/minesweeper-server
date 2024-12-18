@@ -1,0 +1,17 @@
+{
+    "mode": "development",
+    "addr": ":8000",
+    "domain": "",
+    "postgres": {
+        "host": "db",
+        "port": 5432,
+        "user": "postgres",
+        "password": "postgres",
+        "db_name": "main"
+    },
+    "jwt": {
+        "token_lifetime": "720h",
+        "private_key_path": "/run/secrets/jwt-private-key.pem",
+        "public_key_path": "/run/secrets/jwt-public-key.pem"
+    }
+}

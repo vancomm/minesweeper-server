@@ -1,0 +1,93 @@
+name: mines
+
+services:
+  gateway:
+    build:
+      context: ..
+      dockerfile: build/Dockerfile
+      args:
+        - SERVER_SOURCES=cmd/gateway/*.go
+    container_name: mines-gateway
+    image: vancomm/mines-gateway:dev
+    ports:
+      - "8080:8080"
+    links:
+      - db
+      - game
+    depends_on:
+      db:
+        condition: service_healthy
+      game:
+        condition: service_started
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=app
+      - POSTGRES_PORT=5432
+      - POSTGRES_SSLMODE=disable
+      - COOKIES_DOMAIN=""
+      - COOKIES_SECURE=""
+      - COOKIES_SAMESITE=none
+      - JWT_PRIVATE_KEY_FILE=/run/secrets/jwt_private_key_file
+      - JWT_PUBLIC_KEY_FILE=/run/secrets/jwt_public_key_file
+    secrets:
+      - db_password
+      - jwt_private_key_file
+      - jwt_public_key_file
+
+  game:
+    build:
+      context: ..
+      dockerfile: build/Dockerfile
+      args:
+        - SERVER_SOURCES=cmd/game/*.go
+    container_name: mines-game
+    image: vancomm/mines-game:dev
+    ports:
+      - "8081:8081"
+    links:
+      - db
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=app
+      - POSTGRES_PORT=5432
+      - POSTGRES_SSLMODE=disable
+    secrets:
+      - db_password
+  
+  db:
+    image: postgres
+    container_name: mines-db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U $$POSTGRES_USER -d $$POSTGRES_DB -c 'select 1' || exit 1"]
+      interval: 5s
+      timeout: 30s
+      retries: 5
+    ports:
+      - "54320:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=app
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+    secrets:
+      - db_password
+
+volumes:
+  db_data:
+
+secrets:
+  db_password:
+    file: ../run/secrets/db_password
+  jwt_private_key_file:
+    file: ../run/secrets/jwt-private-key.pem
+  jwt_public_key_file:
+    file: ../run/secrets/jwt-public-key.pem

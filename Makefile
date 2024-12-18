@@ -1,24 +1,15 @@
-SOURCES 				= $(wildcard *.go) $(wildcard */*.go)
-BINARY_NAME 			= bin/main.out
+SOURCES_DIR 			= cmd
+BINARY_DIR				= bin
 CGO_ENABLED 			= 1
 
-LOCAL_COMPOSE_FLAGS		= -f compose.local.yml
-STAGING_DOCKER_FLAGS	= -c remote
-STAGING_COMPOSE_FLAGS	= -f compose.staging.yml
-
 .PHONY: all
-all: ${BINARY_NAME}
+all: gateway game
 
-${BINARY_NAME}: $(SOURCES)
-	go build -o $@ *.go
+gateway: $(wildcard ${SOURCES_DIR}/gateway/*.go)
+	go build -o ${BINARY_DIR}/gateway $@
 
-.PHONY: dev
-dev: ${BINARY_NAME}
-	docker compose ${LOCAL_COMPOSE_FLAGS} up --build
-
-.PHONY: stage
-stage: ${BINARY_NAME}
-	docker ${STAGING_DOCKER_FLAGS} compose ${STAGING_COMPOSE_FLAGS} up --build
+game: $(wildcard ${SOURCES_DIR}/game/*.go)
+	go build -o ${BINARY_DIR}/game $@
 
 .PHONY: test
 test:

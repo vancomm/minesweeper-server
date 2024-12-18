@@ -1,0 +1,15 @@
+[Unit]
+Description=Minesweeper Server Docker Compose bundle
+Documentation=https://github.com/vancomm/minesweeper-server
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/var/lib/minesweeper/%i
+ExecStart=/bin/sh -c "docker compose -f /var/lib/minesweeper/compose.%i.yml up --detach"
+ExecStop=/bin/sh -c "docker compose -f /var/lib/minesweeper/compose.%i.yml stop"
+
+[Install]
+WantedBy=multi-user.target
