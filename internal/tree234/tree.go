@@ -55,7 +55,7 @@ func (t *Tree234[T]) addInsert(
 	})
 
 	/*
-		We need to insert the new left/element/right set in n at child position ki.
+		We need to insert the new left/element/right set in n at child point ki.
 	*/
 	var (
 		lcount = left.Count()
@@ -300,7 +300,7 @@ func (t *Tree234[T]) addInternal(e *T, index int) *T {
 		if index >= 0 {
 			if n.kids[0] == nil {
 				/*
-				 * Leaf node. We want to insert at kid position
+				 * Leaf node. We want to insert at kid point
 				 * equal to the index:
 				 *
 				 *   0 A 1 B 2 C 3

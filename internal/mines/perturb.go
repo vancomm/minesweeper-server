@@ -145,7 +145,7 @@ func (ctx *mineCtx) Perturb(
 	*  - first, unknown squares on the boundary of known space
 	*  - next, unknown squares beyond that boundary
 	* 	- as a very last resort, known squares, but not within one
-	* 	  square of the starting position.
+	* 	  square of the starting point.
 	*
 	* Each of these sections needs to be shuffled independently.
 	* We do this by preparing list of all squares and then sorting
@@ -155,7 +155,7 @@ func (ctx *mineCtx) Perturb(
 	for y := range ctx.height {
 		for x := range ctx.width {
 			/*
-			 * If this square is too near the starting position,
+			 * If this square is too near the starting point,
 			 * don't put it on the list at all.
 			 */
 			if absDiff(y, ctx.sy) <= 1 && absDiff(x, ctx.sx) <= 1 {

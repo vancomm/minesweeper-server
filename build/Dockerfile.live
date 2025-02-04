@@ -1,0 +1,29 @@
+# syntax=docker/dockerfile:1
+
+FROM golang:1.23.2 AS runtime
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+
+RUN go mod download -x
+
+RUN go install github.com/air-verse/air@latest
+
+ENV GOFLAGS="-buildvcs=false"
+
+FROM runtime AS gateway
+
+CMD [ \
+    "air", \
+    "-c", ".air.toml", \
+    "-build.cmd", "go build -o ./tmp/main ./cmd/gateway" \
+]
+
+FROM runtime AS game
+
+CMD [ \
+    "air", \
+    "-c", ".air.toml", \
+    "-build.cmd", "go build -o ./tmp/main ./cmd/game" \
+]

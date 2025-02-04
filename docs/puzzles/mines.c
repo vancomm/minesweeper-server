@@ -70,7 +70,7 @@ struct mine_layout {
 struct game_state {
     int w, h, n;
     bool dead, won, used_solve;
-    struct mine_layout *layout;	       /* real mine positions */
+    struct mine_layout *layout;	       /* real mine points */
     signed char *grid;			       /* player knowledge */
     /*
      * Each item in the `grid' array is one of the following values:
@@ -260,7 +260,7 @@ static const char *validate_params(const game_params *params, bool full)
      * wall there are only as many covered squares left as there
      * are mines); but if it's odd, you are doomed, because you
      * _have_ to have a gap somewhere which you can't determine the
-     * position of.
+     * point of.
      */
     if (full && params->unique && (params->w <= 2 || params->h <= 2))
 	return "Width and height must both be greater than two";
@@ -1422,7 +1422,7 @@ static struct perturbations *mineperturb(void *vctx, signed char *grid,
      *  - first, unknown squares on the boundary of known space
      *  - next, unknown squares beyond that boundary
      * 	- as a very last resort, known squares, but not within one
-     * 	  square of the starting position.
+     * 	  square of the starting point.
      * 
      * Each of these sections needs to be shuffled independently.
      * We do this by preparing list of all squares and then sorting
@@ -1433,7 +1433,7 @@ static struct perturbations *mineperturb(void *vctx, signed char *grid,
     for (y = 0; y < ctx->h; y++)
 		for (x = 0; x < ctx->w; x++) {
 			/*
-			* If this square is too near the starting position,
+			* If this square is too near the starting point,
 			* don't put it on the list at all.
 			*/
 			if (abs(y - ctx->sy) <= 1 && abs(x - ctx->sx) <= 1)

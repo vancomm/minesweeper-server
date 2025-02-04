@@ -7,37 +7,23 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/vancomm/minesweeper-server/internal/config"
 	"github.com/vancomm/minesweeper-server/internal/handlers"
 	"github.com/vancomm/minesweeper-server/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 )
 
-type AuthHandler struct {
+type application struct {
+	mount   string
 	logger  *slog.Logger
 	repo    *repository.Queries
 	cookies *config.Cookies
 	jwt     *config.JWT
-}
-
-func NewAuthHandler(
-	logger *slog.Logger,
-	db *pgxpool.Pool,
-	cookies *config.Cookies,
-	jwt *config.JWT,
-) *AuthHandler {
-	auth := &AuthHandler{
-		logger:  logger,
-		repo:    repository.New(db),
-		cookies: cookies,
-		jwt:     jwt,
-	}
-	return auth
 }
 
 var (
@@ -46,11 +32,25 @@ var (
 	ErrUsernameTaken      = fmt.Errorf("username taken")
 )
 
-func (h *AuthHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
+func (app application) ServeMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST "+app.mount+"/login", app.handleLogin)
+	mux.HandleFunc("POST "+app.mount+"/register", app.handleRegister)
+	mux.HandleFunc(app.mount+"/game/", app.authenticate(
+		app.proxy("http://game:8080"),
+	))
+	mux.HandleFunc(app.mount+"/status", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("OK"))
+	})
+	return mux
+}
+
+func (app *application) handleLogin(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		h.logger.Debug("could not parse request form")
+		app.logger.Debug("could not parse request form")
 		return
 	}
 
@@ -58,19 +58,19 @@ func (h *AuthHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	if username == "" || password == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		handlers.SendErrorOrLog(w, h.logger, ErrBadAuthBody)
+		handlers.SendErrorOrLog(w, app.logger, ErrBadAuthBody)
 		return
 	}
 
-	player, err := h.repo.GetPlayer(r.Context(), username)
+	player, err := app.repo.GetPlayer(r.Context(), username)
 	if errors.Is(err, pgx.ErrNoRows) {
 		w.WriteHeader(http.StatusUnauthorized)
-		h.logger.Debug("username not found")
+		app.logger.Debug("username not found")
 		return
 	}
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		h.logger.Error("could not fetch player from db", "error", err)
+		app.logger.Error("could not fetch player from db", "error", err)
 		return
 	}
 
@@ -79,33 +79,33 @@ func (h *AuthHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	)
 	if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
 		w.WriteHeader(http.StatusUnauthorized)
-		h.logger.Debug("wrong password")
+		app.logger.Debug("wrong password")
 		return
 	}
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		h.logger.Error("bcrypt compare error", "error", err)
+		app.logger.Error("bcrypt compare error", "error", err)
 		return
 	}
 
 	claims := config.NewPlayerClaims(player.PlayerID, player.Username)
-	token, err := h.jwt.Sign(claims)
+	token, err := app.jwt.Sign(claims)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		h.logger.Error("failed to sign player claims", "error", err)
+		app.logger.Error("failed to sign player claims", "error", err)
 		return
 	}
 
-	err = h.cookies.Refresh(w, token)
+	err = app.cookies.Refresh(w, token)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		h.logger.Error("failed to set auth cookies", "error", err)
+		app.logger.Error("failed to set auth cookies", "error", err)
 	}
 
-	handlers.SendMessageOrLog(w, h.logger, "ok")
+	handlers.SendMessageOrLog(w, app.logger, "ok")
 }
 
-func (h *AuthHandler) handleRegister(w http.ResponseWriter, r *http.Request) {
+func (app *application) handleRegister(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -116,25 +116,25 @@ func (h *AuthHandler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	if username == "" || password == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		handlers.SendErrorOrLog(w, h.logger, ErrBadAuthBody)
+		handlers.SendErrorOrLog(w, app.logger, ErrBadAuthBody)
 		return
 	}
 
 	passwordBytes := []byte(password)
 	if len(passwordBytes) > 72 {
 		w.WriteHeader(http.StatusBadRequest)
-		handlers.SendErrorOrLog(w, h.logger, ErrBadPasswordTooLong)
+		handlers.SendErrorOrLog(w, app.logger, ErrBadPasswordTooLong)
 		return
 	}
 
 	hash, err := bcrypt.GenerateFromPassword(passwordBytes, bcrypt.MinCost)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		h.logger.Error("unable to hash password", "password", password, "error", err)
+		app.logger.Error("unable to hash password", "password", password, "error", err)
 		return
 	}
 
-	player, err := h.repo.CreatePlayer(r.Context(), repository.CreatePlayerParams{
+	player, err := app.repo.CreatePlayer(r.Context(), repository.CreatePlayerParams{
 		Username:     username,
 		PasswordHash: hash,
 	})
@@ -142,35 +142,35 @@ func (h *AuthHandler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if errors.As(err, &pgErr) &&
 		pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
 		w.WriteHeader(http.StatusConflict)
-		handlers.SendErrorOrLog(w, h.logger, ErrUsernameTaken)
+		handlers.SendErrorOrLog(w, app.logger, ErrUsernameTaken)
 		return
 	}
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		h.logger.Error("unable to insert player", "error", err)
+		app.logger.Error("unable to insert player", "error", err)
 		return
 	}
 
-	token, err := h.jwt.Sign(
+	token, err := app.jwt.Sign(
 		config.NewPlayerClaims(player.PlayerID, player.Username),
 	)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		h.logger.Error("unable to create a jwt token", "error", err)
+		app.logger.Error("unable to create a jwt token", "error", err)
 	}
 
-	err = h.cookies.Refresh(w, token)
+	err = app.cookies.Refresh(w, token)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		h.logger.Error("failed to set auth cookies", "error", err)
+		app.logger.Error("failed to set auth cookies", "error", err)
 	}
 
-	handlers.SendMessageOrLog(w, h.logger, "ok")
+	handlers.SendMessageOrLog(w, app.logger, "ok")
 }
 
-func (h *AuthHandler) authenticate(next http.HandlerFunc) http.HandlerFunc {
+func (app *application) authenticate(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		claims, err := h.cookies.ParsePlayerClaims(r)
+		claims, err := app.cookies.ParsePlayerClaims(r)
 		if err != nil {
 			r.Header.Add("X-Player-ID", "anon")
 		} else {
@@ -180,13 +180,13 @@ func (h *AuthHandler) authenticate(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (h *AuthHandler) proxy(target string) http.HandlerFunc {
+func (app *application) proxy(target string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		targetURL := target + r.URL.RequestURI()
+		targetURL := target + strings.TrimPrefix(r.URL.RequestURI(), app.mount)
 		req, err := http.NewRequest(r.Method, targetURL, r.Body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadGateway)
-			h.logger.Error("failed to create proxy request", "error", err)
+			app.logger.Error("failed to create proxy request", "error", err)
 			return
 		}
 
@@ -196,7 +196,7 @@ func (h *AuthHandler) proxy(target string) http.HandlerFunc {
 		resp, err := client.Do(req)
 		if err != nil {
 			w.WriteHeader(http.StatusBadGateway)
-			h.logger.Error("failed to make proxy request", "error", err)
+			app.logger.Error("failed to make proxy request", "error", err)
 			return
 		}
 		defer resp.Body.Close()
@@ -212,7 +212,7 @@ func (h *AuthHandler) proxy(target string) http.HandlerFunc {
 		_, err = io.Copy(w, resp.Body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadGateway)
-			h.logger.Error("failed to proxy response body", "error", err)
+			app.logger.Error("failed to proxy response body", "error", err)
 			return
 		}
 	}

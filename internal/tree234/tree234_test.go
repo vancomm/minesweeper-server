@@ -181,7 +181,7 @@ func verifyTree[T any](t *testing.T, tree *Tree234[T], array []*T) {
 			"tree contains more than %d elements",
 			len(array))
 		require.Equal(t, array[i], tree.Index(i),
-			"enum at position %d: array says %v, tree says %v",
+			"enum at point %d: array says %v, tree says %v",
 			i, array[i], tree.Index(i))
 	}
 

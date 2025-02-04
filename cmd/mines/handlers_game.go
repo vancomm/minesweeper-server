@@ -53,7 +53,7 @@ func handleNewGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	params := mines.GameParams(gameParams)
-	if !params.ValidatePosition(posParams.X, posParams.Y) {
+	if !params.ValidatePoint(posParams.X, posParams.Y) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -124,7 +124,7 @@ func handleOpen(w http.ResponseWriter, r *http.Request) {
 		log.Error(err)
 		return
 	}
-	if !session.State.ValidatePosition(posParams.X, posParams.Y) {
+	if !session.State.ValidatePoint(posParams.X, posParams.Y) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -163,7 +163,7 @@ func handleFlag(w http.ResponseWriter, r *http.Request) {
 		log.Error(err)
 		return
 	}
-	if !session.State.ValidatePosition(posParams.X, posParams.Y) {
+	if !session.State.ValidatePoint(posParams.X, posParams.Y) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -198,7 +198,7 @@ func handleChord(w http.ResponseWriter, r *http.Request) {
 		log.Error(err)
 		return
 	}
-	if !session.State.ValidatePosition(posParams.X, posParams.Y) {
+	if !session.State.ValidatePoint(posParams.X, posParams.Y) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

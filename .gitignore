@@ -1,4 +1,5 @@
 bin
 log
+tmp
 *.sqlite
 *.local

@@ -44,7 +44,7 @@ func ParseGameParams(seed string) (*GameParams, error) {
 	return p, nil
 }
 
-func (p GameParams) ValidatePosition(x, y int) bool {
+func (p GameParams) ValidatePoint(x, y int) bool {
 	return y*p.Width+x < p.Width*p.Height
 }
 

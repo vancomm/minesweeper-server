@@ -44,7 +44,7 @@ func executeCommand(g *mines.GameState, c string) (err error) {
 	case "o":
 		if x, y, err := parseXY(parts[1:]); err != nil {
 			return err
-		} else if !g.ValidatePosition(x, y) {
+		} else if !g.ValidatePoint(x, y) {
 			return errors.New("invalid square coordinates")
 		} else {
 			g.OpenCell(x, y)
@@ -53,7 +53,7 @@ func executeCommand(g *mines.GameState, c string) (err error) {
 	case "f":
 		if x, y, err := parseXY(parts[1:]); err != nil {
 			return err
-		} else if !g.ValidatePosition(x, y) {
+		} else if !g.ValidatePoint(x, y) {
 			return errors.New("invalid square coordinates")
 		} else {
 			g.FlagCell(x, y)
@@ -62,7 +62,7 @@ func executeCommand(g *mines.GameState, c string) (err error) {
 	case "c":
 		if x, y, err := parseXY(parts[1:]); err != nil {
 			return err
-		} else if !g.ValidatePosition(x, y) {
+		} else if !g.ValidatePoint(x, y) {
 			return errors.New("invalid square coordinates")
 		} else {
 			g.ChordCell(x, y)

@@ -69,7 +69,7 @@ func parseCommand(g *mines.GameState, c string) error {
 		if err != nil {
 			return err
 		}
-		if !g.ValidatePosition(x, y) {
+		if !g.ValidatePoint(x, y) {
 			return fmt.Errorf("invalid square coordinates")
 		}
 		g.OpenCell(x, y)
@@ -77,7 +77,7 @@ func parseCommand(g *mines.GameState, c string) error {
 	case "f":
 		if x, y, err := parseXY(parts[1:]); err != nil {
 			return err
-		} else if !g.ValidatePosition(x, y) {
+		} else if !g.ValidatePoint(x, y) {
 			return fmt.Errorf("invalid square coordinates")
 		} else {
 			g.FlagCell(x, y)
@@ -86,7 +86,7 @@ func parseCommand(g *mines.GameState, c string) error {
 	case "c":
 		if x, y, err := parseXY(parts[1:]); err != nil {
 			return err
-		} else if !g.ValidatePosition(x, y) {
+		} else if !g.ValidatePoint(x, y) {
 			return fmt.Errorf("invalid square coordinates")
 		} else {
 			g.ChordCell(x, y)
@@ -99,7 +99,7 @@ func parseCommand(g *mines.GameState, c string) error {
 	return fmt.Errorf("invalid command")
 }
 
-func (g GameHandler) ConnectWS(w http.ResponseWriter, r *http.Request) {
+func (g application) wsConnect(w http.ResponseWriter, r *http.Request) {
 	sessionId, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)

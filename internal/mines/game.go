@@ -16,7 +16,7 @@ var Log = logrus.New()
 type GameState struct {
 	GameParams
 	Dead, Won, UsedSolve bool
-	Grid                 []bool   /* real mine positions */
+	Grid                 []bool   /* real mine points */
 	PlayerGrid           GridInfo /* player knowledge */
 	/*
 	 * Each item in the `grid' array is one of the following values:

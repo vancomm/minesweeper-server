@@ -62,20 +62,20 @@ func (g GameHandler) NewGame(w http.ResponseWriter, r *http.Request) {
 
 	gameParams := mines.GameParams(dto)
 
-	pos, err := ParsePosition(query)
+	p, err := ParsePoint(query)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		sendJSONOrLog(w, g.logger, wrapError(err))
 		return
 	}
 
-	if !gameParams.ValidatePosition(pos.X, pos.Y) {
+	if !gameParams.ValidatePoint(p.X, p.Y) {
 		w.WriteHeader(http.StatusBadRequest)
-		sendJSONOrLog(w, g.logger, wrapError(fmt.Errorf("invalid cell position")))
+		sendJSONOrLog(w, g.logger, wrapError(fmt.Errorf("invalid cell point")))
 		return
 	}
 
-	game, err := mines.NewGame(&gameParams, pos.X, pos.Y, g.rnd)
+	game, err := mines.NewGame(&gameParams, p.X, p.Y, g.rnd)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		g.logger.Error("unable to generate a new game", "error", err)
@@ -180,7 +180,7 @@ func (g GameHandler) MakeAMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pos, err := ParsePosition(query)
+	p, err := ParsePoint(query)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		sendJSONOrLog(w, g.logger, wrapError(err))
@@ -211,18 +211,18 @@ func (g GameHandler) MakeAMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !game.ValidatePosition(pos.X, pos.Y) {
+	if !game.ValidatePoint(p.X, p.Y) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	switch move {
 	case Open:
-		game.OpenCell(pos.X, pos.Y)
+		game.OpenCell(p.X, p.Y)
 	case Flag:
-		game.FlagCell(pos.X, pos.Y)
+		game.FlagCell(p.X, p.Y)
 	case Chord:
-		game.ChordCell(pos.X, pos.Y)
+		game.ChordCell(p.X, p.Y)
 	}
 
 	if game.Won || game.Dead {

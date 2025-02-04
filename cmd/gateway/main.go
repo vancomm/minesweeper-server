@@ -10,13 +10,21 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/lmittmann/tint"
 	"github.com/vancomm/minesweeper-server/internal/config"
 	"github.com/vancomm/minesweeper-server/internal/database"
 	"github.com/vancomm/minesweeper-server/internal/middleware"
+	"github.com/vancomm/minesweeper-server/internal/repository"
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	var logger *slog.Logger
+	if config.Development() {
+		logger = slog.New(tint.NewHandler(os.Stderr, nil))
+	} else {
+		logger = slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	}
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
@@ -38,20 +46,19 @@ func main() {
 		return
 	}
 
-	auth := NewAuthHandler(logger, db, cookies, jwt)
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /login", auth.handleLogin)
-	mux.HandleFunc("POST /register", auth.handleRegister)
-	mux.HandleFunc("/games/", auth.authenticate(
-		auth.proxy("http://game:8080"),
-	))
-
-	server := &http.Server{
-		Addr:    ":8080",
-		Handler: middleware.Logging(logger)(mux),
+	mount := config.Mount()
+	app := &application{
+		mount:   mount,
+		logger:  logger,
+		repo:    repository.New(db),
+		cookies: cookies,
+		jwt:     jwt,
 	}
-
+	port := config.Port()
+	server := &http.Server{
+		Addr:    port,
+		Handler: middleware.Logging(logger)(app.ServeMux()),
+	}
 	errCh := make(chan error, 1)
 
 	go func() {
@@ -62,7 +69,8 @@ func main() {
 		close(errCh)
 	}()
 
-	logger.Info("gateway listening", slog.String("addr", ":8080"))
+	logger.Info("gateway listening", slog.String("port", port))
+	logger.Info("app available at http://localhost" + port + mount + "/status")
 
 	select {
 	case <-ctx.Done():

@@ -3,7 +3,7 @@ package mines
 import (
 	"fmt"
 
-	"github.com/vancomm/minesweeper-server/pkg/tree234"
+	"github.com/vancomm/minesweeper-server/internal/tree234"
 )
 
 /*
@@ -159,9 +159,9 @@ func (ss *setstore) overlap(x, y int, mask word) (ret []*set) {
 				y:    yy,
 				mask: 0,
 			}
-			if el, pos := ss.sets.FindRelPos(&stmp, tree234.Ge); el != nil {
-				for s := ss.sets.Index(pos); s != nil &&
-					s.x == xx && s.y == yy; s = ss.sets.Index(pos) {
+			if el, p := ss.sets.FindRelPos(&stmp, tree234.Ge); el != nil {
+				for s := ss.sets.Index(p); s != nil &&
+					s.x == xx && s.y == yy; s = ss.sets.Index(p) {
 					/*
 					 * This set potentially overlaps the input one.
 					 * Compute the intersection to see if they
@@ -174,7 +174,7 @@ func (ss *setstore) overlap(x, y int, mask word) (ret []*set) {
 						 */
 						ret = append(ret, s)
 					}
-					pos++
+					p++
 				}
 			}
 		}

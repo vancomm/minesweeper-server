@@ -11,11 +11,12 @@ func _() {
 	_ = x[Open-1]
 	_ = x[Flag-2]
 	_ = x[Chord-3]
+	_ = x[LAST_MOVE-4]
 }
 
-const _GameMove_name = "OpenFlagChord"
+const _GameMove_name = "OpenFlagChordLAST_MOVE"
 
-var _GameMove_index = [...]uint8{0, 4, 8, 13}
+var _GameMove_index = [...]uint8{0, 4, 8, 13, 22}
 
 func (i GameMove) String() string {
 	i -= 1

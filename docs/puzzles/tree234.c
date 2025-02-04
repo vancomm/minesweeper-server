@@ -111,7 +111,7 @@ static int add234_insert(node234 *left, void *e, node234 *right,
     int lcount, rcount;
     /*
      * We need to insert the new left/element/right set in n at
-     * child position ki.
+     * child point ki.
      */
     lcount = countnode234(left);
     rcount = countnode234(right);
@@ -122,7 +122,7 @@ static int add234_insert(node234 *left, void *e, node234 *right,
 	     n->kids[1], n->counts[1], n->elems[1],
 	     n->kids[2], n->counts[2], n->elems[2],
 	     n->kids[3], n->counts[3]));
-	LOG(("  need to insert %p/%d \"%s\" %p/%d at position %d\n",
+	LOG(("  need to insert %p/%d \"%s\" %p/%d at point %d\n",
 	     left, lcount, e, right, rcount, ki));
 	if (n->elems[1] == NULL) {
 	    /*
@@ -329,7 +329,7 @@ static void *add234_internal(tree234 *t, void *e, int index) {
 	if (index >= 0) {
 	    if (!n->kids[0]) {
 		/*
-		 * Leaf node. We want to insert at kid position
+		 * Leaf node. We want to insert at kid point
 		 * equal to the index:
 		 * 
 		 *   0 A 1 B 2 C 3

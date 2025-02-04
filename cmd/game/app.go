@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/vancomm/minesweeper-server/internal/config"
 	"github.com/vancomm/minesweeper-server/internal/handlers"
@@ -20,26 +19,22 @@ import (
 	"github.com/vancomm/minesweeper-server/internal/repository"
 )
 
-type GameHandler struct {
+type application struct {
+	mount  string
 	logger *slog.Logger
 	repo   *repository.Queries
 	ws     *config.WebSocket
 	rnd    *rand.Rand
 }
 
-func NewGameHandler(
-	logger *slog.Logger,
-	db *pgxpool.Pool,
-	ws *config.WebSocket,
-	rnd *rand.Rand,
-) *GameHandler {
-	handler := &GameHandler{
-		logger: logger,
-		repo:   repository.New(db),
-		ws:     ws,
-		rnd:    rnd,
-	}
-	return handler
+func (app application) ServeMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST "+app.mount, app.newGame)
+	mux.HandleFunc("GET "+app.mount+"/{id}", app.fetchGame)
+	mux.HandleFunc("POST "+app.mount+"/{id}/move", app.makeAMove)
+	mux.HandleFunc("POST "+app.mount+"/{id}/forfeit", app.forfeit)
+	mux.HandleFunc(app.mount+"/{id}/connect", app.wsConnect)
+	return mux
 }
 
 func getAuthenticatedPlayerId(r *http.Request) (int64, bool) {
@@ -48,7 +43,7 @@ func getAuthenticatedPlayerId(r *http.Request) (int64, bool) {
 	return playerId, err == nil
 }
 
-func (g GameHandler) NewGame(w http.ResponseWriter, r *http.Request) {
+func (g application) newGame(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
 	dto, err := ParseNewGameDTO(query)
@@ -60,20 +55,20 @@ func (g GameHandler) NewGame(w http.ResponseWriter, r *http.Request) {
 
 	gameParams := mines.GameParams(dto)
 
-	pos, err := ParsePosition(query)
+	p, err := parsePoint(query)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		handlers.SendErrorOrLog(w, g.logger, err)
 		return
 	}
 
-	if !gameParams.ValidatePosition(pos.X, pos.Y) {
+	if !gameParams.ValidatePoint(p.X, p.Y) {
 		w.WriteHeader(http.StatusBadRequest)
-		handlers.SendErrorOrLog(w, g.logger, fmt.Errorf("invalid cell position"))
+		handlers.SendErrorOrLog(w, g.logger, fmt.Errorf("invalid cell point"))
 		return
 	}
 
-	game, err := mines.NewGame(&gameParams, pos.X, pos.Y, g.rnd)
+	game, err := mines.NewGame(&gameParams, p.X, p.Y, g.rnd)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		g.logger.Error("unable to generate a new game", "error", err)
@@ -135,7 +130,7 @@ func (g GameHandler) NewGame(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (g GameHandler) Fetch(w http.ResponseWriter, r *http.Request) {
+func (g application) fetchGame(w http.ResponseWriter, r *http.Request) {
 	sessionId, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -162,7 +157,7 @@ func (g GameHandler) Fetch(w http.ResponseWriter, r *http.Request) {
 	handlers.SendJSONOrLog(w, g.logger, session)
 }
 
-func (g GameHandler) MakeAMove(w http.ResponseWriter, r *http.Request) {
+func (g application) makeAMove(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
 	move, err := ParseGameMove(query.Get("move"))
@@ -172,7 +167,7 @@ func (g GameHandler) MakeAMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pos, err := ParsePosition(query)
+	p, err := parsePoint(query)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		handlers.SendErrorOrLog(w, g.logger, err)
@@ -209,18 +204,18 @@ func (g GameHandler) MakeAMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !game.ValidatePosition(pos.X, pos.Y) {
+	if !game.ValidatePoint(p.X, p.Y) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	switch move {
 	case Open:
-		game.OpenCell(pos.X, pos.Y)
+		game.OpenCell(p.X, p.Y)
 	case Flag:
-		game.FlagCell(pos.X, pos.Y)
+		game.FlagCell(p.X, p.Y)
 	case Chord:
-		game.ChordCell(pos.X, pos.Y)
+		game.ChordCell(p.X, p.Y)
 	}
 
 	if game.Won || game.Dead {
@@ -251,7 +246,7 @@ func (g GameHandler) MakeAMove(w http.ResponseWriter, r *http.Request) {
 	handlers.SendJSONOrLog(w, g.logger, session)
 }
 
-func (g GameHandler) Forfeit(w http.ResponseWriter, r *http.Request) {
+func (g application) forfeit(w http.ResponseWriter, r *http.Request) {
 	sessionId, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)

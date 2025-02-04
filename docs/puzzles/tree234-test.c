@@ -323,7 +323,7 @@ static void verifytree(tree234 *tree, void **array, int arraylen) {
         if (i >= arraylen)
             error("tree contains more than %d elements", arraylen);
         if (array[i] != p)
-            error("enum at position %d: array says %s, tree says %s",
+            error("enum at point %d: array says %s, tree says %s",
                    i, array[i], p);
     }
     if (ctx.elemcount != i) {

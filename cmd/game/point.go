@@ -1,16 +1,16 @@
-package handlers
+package main
 
 import "github.com/gorilla/schema"
 
-type Point struct {
+type point struct {
 	X int `schema:"x,required"`
 	Y int `schema:"y,required"`
 }
 
-func ParsePoint(src map[string][]string) (Point, error) {
+func parsePoint(src map[string][]string) (point, error) {
 	pointDecoder := schema.NewDecoder()
 	pointDecoder.IgnoreUnknownKeys(true)
-	var p Point
+	var p point
 	err := pointDecoder.Decode(&p, src)
 	return p, err
 }

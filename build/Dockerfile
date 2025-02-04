@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 
 ARG GO_VERSION=1.23.2
+
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS build
+
 WORKDIR /src
 
 RUN --mount=type=cache,target=/go/pkg/mod/ \
@@ -9,22 +11,31 @@ RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,source=go.mod,target=go.mod \
     go mod download -x
 
-ARG TARGETARCH
-
 COPY . /src
-
-RUN go install golang.org/x/tools/cmd/stringer
+    
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go install golang.org/x/tools/cmd/stringer
 
 RUN go generate ./...
 
-ARG SERVER_SOURCES
+ARG CGO_ENABLED=1
+
+ARG TARGETARCH
 
 RUN --mount=type=cache,target=/go/pkg/mod/ \
-    CGO_ENABLED=1 GOARCH=$TARGETARCH go build -o /bin/server ${SERVER_SOURCES}
+    CGO_ENABLED=$CGO_ENABLED \
+    GOARCH=$TARGETARCH \
+    go build -o /bin/gateway ./cmd/gateway 
 
-FROM debian:latest AS final
+RUN --mount=type=cache,target=/go/pkg/mod/ \
+    CGO_ENABLED=$CGO_ENABLED \
+    GOARCH=$TARGETARCH \
+    go build -o /bin/game ./cmd/game
+
+FROM debian:latest AS runtime
 
 ARG UID=10001
+
 RUN adduser \
     --disabled-password \
     --gecos "" \
@@ -35,8 +46,15 @@ RUN adduser \
     appuser
 USER appuser
 
-COPY --from=build /bin/server /bin/
+COPY --from=build \
+    /bin/gateway /bin/game /bin/
 
 EXPOSE 8080
 
-ENTRYPOINT [ "/bin/server" ]
+FROM runtime AS gateway
+
+ENTRYPOINT [ "/bin/gateway" ]
+
+FROM runtime AS game
+
+ENTRYPOINT [ "/bin/game" ]

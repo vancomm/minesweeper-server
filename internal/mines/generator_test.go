@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	"github.com/vancomm/minesweeper-server/pkg/tree234"
+	"github.com/vancomm/minesweeper-server/internal/tree234"
 )
 
 func TestMain(m *testing.M) {
