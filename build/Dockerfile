@@ -4,14 +4,14 @@ ARG GO_VERSION=1.23.2
 
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS build
 
-WORKDIR /src
+WORKDIR /app
 
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,source=go.sum,target=go.sum \
     --mount=type=bind,source=go.mod,target=go.mod \
     go mod download -x
 
-COPY . /src
+COPY . /app
     
 RUN --mount=type=cache,target=/go/pkg/mod \
     go install golang.org/x/tools/cmd/stringer
@@ -25,14 +25,21 @@ ARG TARGETARCH
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     CGO_ENABLED=$CGO_ENABLED \
     GOARCH=$TARGETARCH \
-    go build -o /bin/gateway ./cmd/gateway 
+    go build -o ./bin/migrator ./cmd/migrator
 
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     CGO_ENABLED=$CGO_ENABLED \
     GOARCH=$TARGETARCH \
-    go build -o /bin/game ./cmd/game
+    go build -o ./bin/gateway ./cmd/gateway
+
+RUN --mount=type=cache,target=/go/pkg/mod/ \
+    CGO_ENABLED=$CGO_ENABLED \
+    GOARCH=$TARGETARCH \
+    go build -o ./bin/game ./cmd/game
 
 FROM debian:latest AS runtime
+
+WORKDIR /app
 
 ARG UID=10001
 
@@ -47,14 +54,18 @@ RUN adduser \
 USER appuser
 
 COPY --from=build \
-    /bin/gateway /bin/game /bin/
+    /app/bin /app/bin
 
 EXPOSE 8080
 
 FROM runtime AS gateway
 
-ENTRYPOINT [ "/bin/gateway" ]
+ENTRYPOINT [ "/app/bin/gateway" ]
 
 FROM runtime AS game
 
-ENTRYPOINT [ "/bin/game" ]
+ENTRYPOINT [ "/app/bin/game" ]
+
+FROM runtime AS migrator
+
+ENTRYPOINT [ "/app/bin/migrator" ]

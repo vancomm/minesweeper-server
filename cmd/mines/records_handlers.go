@@ -13,7 +13,7 @@ func handleGetRecords(w http.ResponseWriter, r *http.Request) {
 		options = append(options, GameRecordsForPlayer(query.Get("username")))
 	}
 	if query.Has("seed") {
-		gameParams, err := mines.ParseGameParams(query.Get("seed"))
+		gameParams, err := mines.ParseSeed(query.Get("seed"))
 		if err != nil {
 			log.Debug(err)
 			w.WriteHeader(http.StatusBadRequest)

@@ -38,6 +38,11 @@ func unauthorized(w http.ResponseWriter) {
 	w.Write([]byte("you are not allowed to execute this operation"))
 }
 
+func badRequest(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusBadRequest)
+	w.Write([]byte("your request is invalid"))
+}
+
 func (app application) ServeMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /", app.handleNewGame)
@@ -45,5 +50,6 @@ func (app application) ServeMux() *http.ServeMux {
 	mux.HandleFunc("POST /{id}/move", app.handleMove)
 	mux.HandleFunc("POST /{id}/forfeit", app.handleForfeit)
 	mux.HandleFunc("CONNECT /{id}/connect", app.wsConnect)
+	mux.HandleFunc("GET /highscores", app.handleFetchHighScores)
 	return mux
 }

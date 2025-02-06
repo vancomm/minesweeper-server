@@ -11,16 +11,19 @@ docker compose -f deployments/compose.yaml up --build
 ### development (live reload)
 
 ```sh
-./dev.sh
+make keys # create JWT keys first time you run
+make dev
 ```
 
 ## requirements
 
 ### dev
 
+- [sqlc](https://github.com/sqlc-dev/sqlc)
 - [air](https://github.com/air-verse/air)
 - openssh
 - openssl
+
 
 ## todo
 

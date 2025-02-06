@@ -27,7 +27,7 @@ func (p GameParams) Seed() string {
 	return fmt.Sprintf("%d:%d:%d:%d", p.Width, p.Height, p.MineCount, u)
 }
 
-func ParseGameParams(seed string) (*GameParams, error) {
+func ParseSeed(seed string) (*GameParams, error) {
 	p := &GameParams{}
 	u := 0
 	sseed := strings.ReplaceAll(seed, ":", " ")
