@@ -1,21 +1,35 @@
 # minesweeper-server
 
-## todo
+## how to run
 
-### global
-- [x] finish mines API
-- [x] write HTTP API
+### production
+
+```sh
+docker compose -f deployments/compose.yaml up --build
+```
+
+### development (live reload)
+
+```sh
+./dev.sh
+```
+
+## requirements
+
+### dev
+
+- [air](https://github.com/air-verse/air)
+- openssh
+- openssl
+
+## todo
 
 ### code quality
 - [ ] refactor C-like parts with Go best practices
+- [ ] add remaining tree234 functionality and tests from tree.c
 
 ### testing
 - [x] add mines tests for different field params (table driven tests?)
 - [ ] convert tree234's TestSuite to unit tests
     - [ ] describe existing tests and decompose
-- [ ] separate tree234 and tree234's tests into different packages
 - [ ] add benchmarks
-
-### misc
-- [ ] add remaining tree234 functionality and tests from tree.c?
-- [ ] move tree234 into a separate project? (publish?)

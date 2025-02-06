@@ -30,29 +30,28 @@ func main() {
 
 	cookies, err := config.NewCookies()
 	if err != nil {
-		logger.Error("failed to read cookies config", "error", err)
+		logger.Error("failed to read cookies config", slog.Any("error", err))
 		return
 	}
 
 	jwt, err := config.NewJWT()
 	if err != nil {
-		logger.Error("failed to read jwt config", "error", err)
+		logger.Error("failed to read jwt config", slog.Any("error", err))
 		return
 	}
 
 	db, err := database.Connect(ctx)
 	if err != nil {
-		logger.Error("failed to connect to db", "error", err)
-		return
+		logger.Error("failed to connect and migrate db", "error", err)
 	}
 
-	mount := config.Mount()
+	mount := config.BasePath()
 	app := &application{
-		mount:   mount,
-		logger:  logger,
-		repo:    repository.New(db),
-		cookies: cookies,
-		jwt:     jwt,
+		basePath: mount,
+		logger:   logger,
+		repo:     repository.New(db),
+		cookies:  cookies,
+		jwt:      jwt,
 	}
 	port := config.Port()
 	server := &http.Server{

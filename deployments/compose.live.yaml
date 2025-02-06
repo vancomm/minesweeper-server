@@ -19,7 +19,7 @@ services:
     volumes:
       - ../:/app
     environment:
-      - APP_MOUNT=/api/v1
+      - APP_BASE_PATH=/api/v1
       - APP_PORT=:8080
       - DEVELOPMENT=1
       - POSTGRES_HOST=db
@@ -31,11 +31,8 @@ services:
       - COOKIES_DOMAIN=""
       - COOKIES_SECURE=""
       - COOKIES_SAMESITE=none
-      - JWT_PRIVATE_KEY_FILE=/run/secrets/jwt_private_key_file
-      - JWT_PUBLIC_KEY_FILE=/run/secrets/jwt_public_key_file
-    secrets:
-      - jwt_private_key_file
-      - jwt_public_key_file
+      - JWT_PRIVATE_KEY_FILE=/app/run/secrets/jwt-private-key.pem
+      - JWT_PUBLIC_KEY_FILE=/app/run/secrets/jwt-public-key.pem
 
   game:
     build:
@@ -52,7 +49,6 @@ services:
     volumes:
       - ../:/app
     environment:
-      - APP_MOUNT=/game
       - APP_PORT=:8080
       - DEVELOPMENT=1
       - POSTGRES_HOST=db
@@ -87,12 +83,3 @@ services:
 
 volumes:
   db_data:
-
-# https://docs.docker.com/compose/how-tos/use-secrets/#use-secrets
-# "Secrets are mounted as a file in /run/secrets/<secret_name> inside the
-# container."
-secrets:
-  jwt_private_key_file:
-    file: ../run/secrets/jwt-private-key.pem
-  jwt_public_key_file:
-    file: ../run/secrets/jwt-public-key.pem

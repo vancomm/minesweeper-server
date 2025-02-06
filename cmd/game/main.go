@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"embed"
 	"errors"
 	"fmt"
 	"hash/maphash"
@@ -19,9 +18,6 @@ import (
 	"github.com/vancomm/minesweeper-server/internal/middleware"
 	"github.com/vancomm/minesweeper-server/internal/repository"
 )
-
-//go:embed migrations/*.sql
-var migrations embed.FS
 
 func createRand() *rand.Rand {
 	return rand.New(rand.NewPCG(
@@ -40,7 +36,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	db, err := database.ConnectAndMigrate(ctx, migrations)
+	db, err := database.Connect(ctx)
 	if err != nil {
 		logger.Error("failed to connect and migrate db", "error", err)
 	}
@@ -51,19 +47,20 @@ func main() {
 		return
 	}
 
-	mount := config.Mount()
+	basePath := config.BasePath()
+	port := config.Port()
+
 	app := &application{
-		mount:  mount,
 		logger: logger,
 		repo:   repository.New(db),
 		ws:     ws,
 		rnd:    createRand(),
 	}
-	port := config.Port()
 	server := &http.Server{
 		Addr:    port,
 		Handler: middleware.Logging(logger)(app.ServeMux()),
 	}
+
 	errCh := make(chan error, 1)
 
 	go func() {
@@ -74,7 +71,7 @@ func main() {
 		close(errCh)
 	}()
 
-	logger.Info("gateway listening", slog.String("addr", ":8080"))
+	logger.Info("game online", slog.String("port", port), slog.String("base path", basePath))
 
 	select {
 	case <-ctx.Done():

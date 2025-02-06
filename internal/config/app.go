@@ -2,8 +2,8 @@ package config
 
 import "os"
 
-func Mount() string {
-	return os.Getenv("APP_MOUNT")
+func BasePath() string {
+	return os.Getenv("APP_BASE_PATH")
 }
 
 func Port() string {
