@@ -20,7 +20,10 @@ import (
 func main() {
 	var logger *slog.Logger
 	if config.Development() {
-		logger = slog.New(tint.NewHandler(os.Stderr, nil))
+		logger = slog.New(
+			tint.NewHandler(os.Stderr, &tint.Options{Level: slog.LevelDebug}),
+		)
+
 	} else {
 		logger = slog.New(slog.NewJSONHandler(os.Stderr, nil))
 	}
@@ -45,15 +48,15 @@ func main() {
 		logger.Error("failed to connect and migrate db", "error", err)
 	}
 
-	mount := config.BasePath()
+	port := config.Port()
+	basePath := config.BasePath()
 	app := &application{
-		basePath: mount,
+		basePath: basePath,
 		logger:   logger,
 		repo:     repository.New(db),
 		cookies:  cookies,
 		jwt:      jwt,
 	}
-	port := config.Port()
 	server := &http.Server{
 		Addr:    port,
 		Handler: middleware.Logging(logger)(app.ServeMux()),
@@ -68,8 +71,8 @@ func main() {
 		close(errCh)
 	}()
 
-	logger.Info("gateway listening", slog.String("port", port))
-	logger.Info("app available at http://localhost" + port + mount + "/status")
+	logger.Info("gateway online", slog.String("port", port), slog.String("base path", basePath))
+	logger.Info("app available at http://localhost" + port + basePath + "/status")
 
 	select {
 	case <-ctx.Done():

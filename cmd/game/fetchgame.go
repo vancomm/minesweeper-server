@@ -2,36 +2,40 @@ package main
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/vancomm/minesweeper-server/internal/handlers"
 )
 
 func (app application) handleFetchGame(w http.ResponseWriter, r *http.Request) {
-	sessionId, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	sessionId, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		notFound(w)
+		app.notFound(w)
 		return
 	}
 
-	session, err := app.repo.GetSession(r.Context(), sessionId)
-	if errors.Is(err, pgx.ErrNoRows) {
-		notFound(w)
-		return
-	}
+	session, err := app.repo.FetchGameSession(r.Context(), sessionId)
 	if err != nil {
-		internalError(w)
-		app.logger.Error("unable to fetch session from db", "error", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			app.notFound(w)
+		} else {
+			app.internalError(w, "unable to fetch session from db", err)
+		}
 		return
 	}
 
-	playerId, ok := getAuthenticatedPlayerId(r)
-	if ok && session.PlayerID != nil && *session.PlayerID != playerId {
-		unauthorized(w)
+	playerId, ok := app.getAuthenticatedPlayerId(r)
+	if ok && session.PlayerId != nil && *session.PlayerId != playerId {
+		app.unauthorized(w)
 		return
 	}
 
-	handlers.SendJSONOrLog(w, app.logger, session)
+	dto, err := NewGameSessionDTO(*session)
+	if err != nil {
+		app.internalError(w, "failed to create game session dto", slog.Any("error", err))
+	}
+
+	app.replyWith(w, dto)
 }

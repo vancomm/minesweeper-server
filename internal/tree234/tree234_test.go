@@ -21,20 +21,20 @@ func insert[T any](s []T, i int, v T) []T {
 	}
 }
 
-type checkCtx struct {
+type testCtx struct {
 	treeDepth int
 	elemCount int
 }
 
-func checkNode[T any](
+func testNode[T any](
 	t *testing.T,
-	ctx *checkCtx, level int,
-	node *Node234[T],
+	ctx *testCtx, level int,
+	node *node234[T],
 	lowbound *T, highbound *T,
 	cmp CompareFunc[T],
 ) int {
 	/* Count the non-NULL kids. */
-	nkids := node.KidsCount()
+	nkids := node.kidsCount()
 	/* Ensure no kids beyond the first NULL are non-NULL. */
 	for i := nkids; i < 4; i++ {
 		require.Nil(t, node.kids[i],
@@ -46,7 +46,7 @@ func checkNode[T any](
 	}
 
 	/* Count the non-NULL elements. */
-	nelems := node.Size()
+	nelems := node.size()
 	/* Ensure no elements beyond the first NULL are non-NULL. */
 	for i := nelems; i < 3; i++ {
 		require.Nil(t, node.elems[i],
@@ -144,7 +144,7 @@ func checkNode[T any](
 		} else {
 			higher = node.elems[i]
 		}
-		subcount := checkNode(t, ctx, level+1, node.kids[i], lower, higher, cmp)
+		subcount := testNode(t, ctx, level+1, node.kids[i], lower, higher, cmp)
 		require.Equal(t, node.counts[i], subcount,
 			"node %s kid %d: count says %d, subtree really has %d",
 			node.String(), i, node.counts[i], subcount)
@@ -154,8 +154,8 @@ func checkNode[T any](
 	return count
 }
 
-func verifyTree[T any](t *testing.T, tree *Tree234[T], array []*T) {
-	ctx := &checkCtx{
+func testTree[T any](t *testing.T, tree *Tree234[T], treeContents []*T) {
+	ctx := &testCtx{
 		treeDepth: -1, /* depth unknown yet */
 		elemCount: 0,  /* no elements seen yet */
 	}
@@ -168,7 +168,7 @@ func verifyTree[T any](t *testing.T, tree *Tree234[T], array []*T) {
 		require.Nil(t, tree.root.parent,
 			"root.parent %v should be nil",
 			tree.root.parent)
-		checkNode(t, ctx, 0, tree.root, nil, nil, tree.cmp)
+		testNode(t, ctx, 0, tree.root, nil, nil, tree.cmp)
 	}
 
 	/*
@@ -177,21 +177,21 @@ func verifyTree[T any](t *testing.T, tree *Tree234[T], array []*T) {
 
 	i := 0
 	for i = 0; tree.Index(i) != nil; i++ {
-		require.Less(t, i, len(array),
+		require.Less(t, i, len(treeContents),
 			"tree contains more than %d elements",
-			len(array))
-		require.Equal(t, array[i], tree.Index(i),
+			len(treeContents))
+		require.Equal(t, treeContents[i], tree.Index(i),
 			"enum at point %d: array says %v, tree says %v",
-			i, array[i], tree.Index(i))
+			i, treeContents[i], tree.Index(i))
 	}
 
 	require.Equal(t, ctx.elemCount, i,
 		"tree really contains %d elements, enum gave %d",
 		ctx.elemCount, i)
 
-	require.GreaterOrEqual(t, i, len(array),
+	require.GreaterOrEqual(t, i, len(treeContents),
 		"enum gave only %d elements, array has %d",
-		i, len(array))
+		i, len(treeContents))
 
 	i = tree.Count()
 	require.Equal(t, ctx.elemCount, i,
@@ -199,7 +199,7 @@ func verifyTree[T any](t *testing.T, tree *Tree234[T], array []*T) {
 		ctx.elemCount, i)
 }
 
-func addTestInternal[T any](t *testing.T, tree *Tree234[T], elem *T, index int, realret *T, array *[]*T) {
+func testAddInternal[T any](t *testing.T, tree *Tree234[T], elem *T, index int, realret *T, array *[]*T) {
 	retval := elem
 
 	*array = insert(*array, index, elem)
@@ -208,10 +208,10 @@ func addTestInternal[T any](t *testing.T, tree *Tree234[T], elem *T, index int, 
 		"add: retval was %v expected %v",
 		realret, retval)
 
-	verifyTree(t, tree, *array)
+	testTree(t, tree, *array)
 }
 
-func addTest[T any](t *testing.T, tree *Tree234[T], elem *T, array *[]*T) {
+func testAdd[T any](t *testing.T, tree *Tree234[T], elem *T, array *[]*T) {
 	realret := tree.Add(elem)
 
 	i := 0
@@ -223,11 +223,11 @@ func addTest[T any](t *testing.T, tree *Tree234[T], elem *T, array *[]*T) {
 		require.Equal(t, (*array)[i], realret,
 			"add: retval was %v expected %v", realret, (*array)[i])
 	} else {
-		addTestInternal(t, tree, elem, i, realret, array)
+		testAddInternal(t, tree, elem, i, realret, array)
 	}
 }
 
-func deletePosTest[T any](t *testing.T, tree *Tree234[T], i int, array *[]*T) {
+func testDeletePos[T any](t *testing.T, tree *Tree234[T], i int, array *[]*T) {
 	elem := (*array)[i]
 
 	*array = remove(*array, i) /* delete elem from array */
@@ -237,10 +237,10 @@ func deletePosTest[T any](t *testing.T, tree *Tree234[T], i int, array *[]*T) {
 	require.Equal(t, ret, elem,
 		"delete returned %v, expected %v", ret, elem)
 
-	verifyTree(t, tree, *array)
+	testTree(t, tree, *array)
 }
 
-func deleteTest[T any](t *testing.T, tree *Tree234[T], elem *T, array *[]*T) {
+func testDelete[T any](t *testing.T, tree *Tree234[T], elem *T, array *[]*T) {
 	i := 0
 	for i < len(*array) && tree.cmp(elem, (*array)[i]) > 0 {
 		i++
@@ -249,118 +249,117 @@ func deleteTest[T any](t *testing.T, tree *Tree234[T], elem *T, array *[]*T) {
 		return /* don't do it! */
 	}
 
-	deletePosTest(t, tree, i, array)
+	testDeletePos(t, tree, i, array)
 }
 
 var rels = map[Relation]string{
 	Eq: "EQ", Ge: "GE", Le: "LE", Lt: "LT", Gt: "GT",
 }
 
-func findTest[T any](t *testing.T, tree *Tree234[T], array *[]*T, allElements []T) {
+func testFind[T any](t *testing.T, tree *Tree234[T], array *[]*T, allElements []T) {
 	for _, p := range allElements {
 		for rel, relName := range rels {
-			var (
-				lo     = 0
-				hi     = len(*array) - 1
-				c, mid int
-				ret    *T
-			)
+			var needle *T
+			lo := 0
+			hi := len(*array) - 1
+			mid := 0
+			cmp := 0
 			for lo <= hi {
 				mid = (lo + hi) / 2
-				c = tree.cmp(&p, (*array)[mid])
-				if c < 0 {
+				cmp = tree.cmp(&p, (*array)[mid])
+				if cmp < 0 {
 					hi = mid - 1
-				} else if c > 0 {
+				} else if cmp > 0 {
 					lo = mid + 1
 				} else {
 					break
 				}
 			}
 
-			if c == 0 {
+			if cmp == 0 {
 				switch rel {
 				case Lt:
 					if mid > 0 {
 						mid -= 1
-						ret = (*array)[mid]
+						needle = (*array)[mid]
 					} else {
-						ret = nil
+						needle = nil
 					}
 				case Gt:
 					if mid < len(*array)-1 {
 						mid += 1
-						ret = (*array)[mid]
+						needle = (*array)[mid]
 					} else {
-						ret = nil
+						needle = nil
 					}
 				default:
-					ret = (*array)[mid]
+					needle = (*array)[mid]
 				}
 			} else {
 				switch rel {
 				case Lt, Le:
 					mid = hi
 					if hi >= 0 {
-						ret = (*array)[hi]
+						needle = (*array)[hi]
 					} else {
-						ret = nil
+						needle = nil
 					}
 				case Gt, Ge:
 					mid = lo
 					if lo < len(*array) {
-						ret = (*array)[lo]
+						needle = (*array)[lo]
 					} else {
-						ret = nil
+						needle = nil
 					}
 				default:
-					ret = nil
+					needle = nil
 				}
 			}
 
-			realret, index := tree.FindRelPos(&p, rel)
+			actual, index := tree.FindRelPos(&p, rel)
 
-			require.Equal(t, realret, ret,
+			require.Equal(t, actual, needle,
 				"find(\"%s\", %s) gave %s should be %s",
-				p, relName, realret, ret)
+				p, relName, actual, needle)
 
-			if realret != nil {
+			if actual != nil {
 				require.Equal(t, index, mid,
 					"find(\"%s\", %s) gave %d should be %d",
 					p, relName, index, mid)
 
 				if rel == Eq {
 					realret2 := tree.Index(index)
-					require.Equal(t, realret2, realret,
+					require.Equal(t, realret2, actual,
 						"find(\"%s\", %s) gave %s(%d) but %d -> %s",
-						p, relName, realret, index, index, realret2)
+						p, relName, actual, index, index, realret2)
 				}
 			}
 		}
 	}
 
 	{
-		realret, index := tree.FindRelPos(nil, Gt)
+		actual, index := tree.FindRelPos(nil, Gt)
 		if len(*array) > 0 {
-			require.True(t, realret == (*array)[0] && index == 0,
+			require.True(t, actual == (*array)[0] && index == 0,
 				"find(nil, Gt) gave %s(%d) should be %s(0)",
-				realret, index, (*array)[0])
+				actual, index, (*array)[0])
 		} else {
-			require.Nil(t, realret,
+			require.Nil(t, actual,
 				"find(nil, Gt) gave %s(%d), should be nil",
-				realret, index)
+				actual, index)
 		}
 	}
 
 	{
-		realret, index := tree.FindRelPos(nil, Lt)
+		actual, index := tree.FindRelPos(nil, Lt)
 		if len(*array) > 0 {
-			require.True(t, realret == (*array)[len(*array)-1] && index == len(*array)-1,
+			require.True(t, actual == (*array)[len(*array)-1] && index == len(*array)-1,
 				"find(nil, Lt) gave %s(%d) should be %s(0)",
-				realret, index, (*array)[len(*array)-1])
+				actual, index, (*array)[len(*array)-1])
 		} else {
-			require.Nil(t, realret,
+			require.Nil(t, actual,
 				"find(nil, Lt) gave %s(%d), should be nil",
-				realret, index)
+				actual, index)
 		}
 	}
 }
@@ -371,13 +370,13 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-type Element string
+type foobar rune
 
-func (e *Element) String() string {
+func (e *foobar) String() string {
 	return "'" + string(*e) + "'"
 }
 
-func elementCmp(a, b *Element) int {
+func foobarCmp(a, b *foobar) int {
 	aa, bb := *a, *b
 	if aa < bb {
 		return -1
@@ -388,38 +387,38 @@ func elementCmp(a, b *Element) int {
 	return 0
 }
 
-func TestSuite(t *testing.T) {
-	var (
-		elements = [...]Element{
-			"0", "2", "3", "I", "K", "d", "H", "J", "Q", "N", "n", "q", "j", "i",
-			"7", "G", "F", "D", "b", "x", "g", "B", "e", "v", "V", "T", "f", "E",
-			"S", "8", "A", "k", "X", "p", "C", "R", "a", "o", "r", "O", "Z", "u",
-			"6", "1", "w", "L", "P", "M", "c", "U", "h", "9", "t", "5", "W", "Y",
-			"m", "s", "l", "4",
-		}
-		allElements = elements[:]
-		tree        = New(elementCmp)
-		array       []*Element
-		in          [len(elements)]bool
-		r           = rand.New(rand.NewPCG(1, 2))
-	)
+var allFoobars = [...]foobar{
+	'0', '2', '3', 'I', 'K', 'd', 'H', 'J', 'Q', 'N', 'n', 'q', 'j', 'i',
+	'7', 'G', 'F', 'D', 'b', 'x', 'g', 'B', 'e', 'v', 'V', 'T', 'f', 'E',
+	'S', '8', 'A', 'k', 'X', 'p', 'C', 'R', 'a', 'o', 'r', 'O', 'Z', 'u',
+	'6', '1', 'w', 'L', 'P', 'M', 'c', 'U', 'h', '9', 't', '5', 'W', 'Y',
+	'm', 's', 'l', '4',
+}
 
-	verifyTree(t, tree, array)
+func TestTree234AllOperations(t *testing.T) {
+	tree := NewTree234(foobarCmp)
+	treeContents := make([]*foobar, 0)
+
+	testTree(t, tree, treeContents)
+
+	var isStored [len(allFoobars)]bool
+	foobars := allFoobars[:]
+	r := rand.New(rand.NewPCG(1, 2))
 
 	for range 10000 {
-		j := r.IntN(len(elements))
-		if in[j] {
-			deleteTest(t, tree, &elements[j], &array)
-			in[j] = false
+		j := r.IntN(len(foobars))
+		if isStored[j] {
+			testDelete(t, tree, &foobars[j], &treeContents)
+			isStored[j] = false
 		} else {
-			addTest(t, tree, &elements[j], &array)
-			in[j] = true
+			testAdd(t, tree, &foobars[j], &treeContents)
+			isStored[j] = true
 		}
-		findTest(t, tree, &array, allElements)
+		testFind(t, tree, &treeContents, allFoobars[:])
 	}
 
-	for len(array) > 0 {
-		j := r.IntN(len(elements))
-		deleteTest(t, tree, &elements[j], &array)
+	for len(treeContents) > 0 {
+		j := r.IntN(len(foobars))
+		testDelete(t, tree, &foobars[j], &treeContents)
 	}
 }

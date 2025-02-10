@@ -17,16 +17,16 @@ type GameSession struct {
 }
 
 type GameSessionJSON struct {
-	SessionId string         `json:"session_id"`
-	Grid      mines.GridInfo `json:"grid"`
-	Width     int            `json:"width"`
-	Height    int            `json:"height"`
-	MineCount int            `json:"mine_count"`
-	Unique    bool           `json:"unique"`
-	Dead      bool           `json:"dead"`
-	Won       bool           `json:"won"`
-	StartedAt int64          `json:"started_at"`
-	EndedAt   *int64         `json:"ended_at,omitempty"`
+	SessionId string     `json:"session_id"`
+	Grid      mines.Grid `json:"grid"`
+	Width     int        `json:"width"`
+	Height    int        `json:"height"`
+	MineCount int        `json:"mine_count"`
+	Unique    bool       `json:"unique"`
+	Dead      bool       `json:"dead"`
+	Won       bool       `json:"won"`
+	StartedAt int64      `json:"started_at"`
+	EndedAt   *int64     `json:"ended_at,omitempty"`
 }
 
 func (s GameSession) MarshalJSON() ([]byte, error) {

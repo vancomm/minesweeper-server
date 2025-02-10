@@ -32,6 +32,7 @@ func (w *loggingWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 func Logging(logger *slog.Logger) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			logger.Info(r.Method + " " + r.URL.RequestURI())
 			start := time.Now()
 
 			wrapped := &loggingWriter{ResponseWriter: w}

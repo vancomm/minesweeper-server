@@ -1,8 +1,8 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"iter"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -15,171 +15,192 @@ import (
 	"github.com/vancomm/minesweeper-server/internal/repository"
 )
 
-func iterBySep(s string, sep string) iter.Seq2[int, string] {
-	return func(yield func(int, string) bool) {
-		i := 0
-		found := true
-		var piece string
-		for found {
-			piece, s, found = strings.Cut(s, sep)
-			if !yield(i, piece) {
-				return
+type wsCommand string
+
+const (
+	wsNoop    wsCommand = "g"
+	wsOpen    wsCommand = "o"
+	wsFlag    wsCommand = "f"
+	wsChord   wsCommand = "c"
+	wsForfeit wsCommand = "r" // =)
+)
+
+type gameExecutor struct {
+	*application
+	*mines.GameState
+}
+
+func newGameExecutor(app *application, state *mines.GameState) *gameExecutor {
+	return &gameExecutor{app, state}
+}
+
+func (game gameExecutor) openCell(args []string) error {
+	x, y, err := parseXY(args)
+	if err != nil {
+		return err
+	}
+	if !game.PointInBounds(x, y) {
+		return fmt.Errorf("invalid square coordinates")
+	}
+	game.OpenCell(x, y)
+	return nil
+}
+
+func (game gameExecutor) flagCell(args []string) error {
+	x, y, err := parseXY(args)
+	if err != nil {
+		return err
+	}
+	if !game.PointInBounds(x, y) {
+		return fmt.Errorf("invalid square coordinates")
+	}
+	game.FlagCell(x, y)
+	return nil
+}
+
+func (game gameExecutor) chordCell(args []string) error {
+	x, y, err := parseXY(args)
+	if err != nil {
+		return err
+	}
+	if !game.PointInBounds(x, y) {
+		return fmt.Errorf("invalid square coordinates")
+	}
+	game.ChordCell(x, y)
+	return nil
+}
+
+func (game gameExecutor) forfeit() error {
+	game.Forfeit()
+	return nil
+}
+
+func (game gameExecutor) execute(query string) error {
+	tokens := strings.Split(" ", query)
+	cmd, args := wsCommand(tokens[0]), tokens[1:]
+	switch cmd {
+	case wsNoop:
+		return nil
+	case wsOpen:
+		return game.openCell(args)
+	case "f":
+		return game.flagCell(args)
+	case "c":
+		return game.chordCell(args)
+	case "r":
+		return game.forfeit()
+	default:
+		return fmt.Errorf("unknown command")
+	}
+}
+
+func (game gameExecutor) wsRunGameLoop(
+	ctx context.Context, conn *websocket.Conn, session *repository.GameSession,
+) error {
+	for {
+		mt, buf, err := conn.ReadMessage()
+		if err != nil {
+			return err
+		}
+		if mt != websocket.TextMessage {
+			return nil
+		}
+
+		message := strings.TrimSpace(string(buf))
+		lines := strings.Split(message, "\n")
+	LINES:
+		for _, line := range lines {
+			err := game.execute(strings.TrimSpace(line))
+			if err != nil {
+				return err
 			}
-			i += 1
+			if game.Won || game.Dead {
+				session.EndedAt.Time = time.Now().UTC()
+				game.RevealPlayerGrid()
+				break LINES
+			}
+		}
+
+		stateBuf, err := game.Bytes()
+		if err != nil {
+			return fmt.Errorf("unable to serialize game state: %w", err)
+		}
+
+		err = game.repo.UpdateGameSession(
+			ctx,
+			session.GameSessionId,
+			repository.UpdateGameSessionParams{
+				State:   &stateBuf,
+				Dead:    &game.Dead,
+				Won:     &game.Won,
+				EndedAt: &session.EndedAt.Time,
+			})
+		if err != nil {
+			return fmt.Errorf("unable to update session in db: %w", err)
+		}
+
+		if err := conn.WriteJSON(session); err != nil {
+			return fmt.Errorf("unable to write json: %w", err)
 		}
 	}
 }
 
-func parseXY(twoStrings []string) (x int, y int, err error) {
-	if x, err = strconv.Atoi(twoStrings[0]); err != nil {
+func (app application) wsConnect(w http.ResponseWriter, r *http.Request) {
+	sessionId, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		app.badRequest(w)
+		app.logger.Debug("invalid session id")
+		return
+	}
+
+	session, err := app.repo.FetchGameSession(r.Context(), sessionId)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			app.notFound(w)
+			app.logger.Debug("session id not found")
+		} else {
+			app.internalError(w, "could not fetch session from db", slog.Any("error", err))
+		}
+		return
+	}
+
+	state, err := mines.DecodeGameState(session.State)
+	if err != nil {
+		app.internalError(w, "game state invalid", slog.Any("error", err))
+		return
+	}
+
+	conn, err := app.ws.Upgrader.Upgrade(w, r, nil) // headers sent here
+	if err != nil {
+		app.logger.Error("unable to upgrade", slog.Any("error", err))
+		return
+	}
+	defer conn.Close()
+
+	app.logger.Debug("established WS connection")
+
+	game := newGameExecutor(&app, state)
+	if err := game.wsRunGameLoop(r.Context(), conn, session); err != nil {
+		if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+			return
+		}
+		app.logger.Warn("error in ws loop", slog.Any("err", err))
+		return
+	}
+}
+
+func parseXY(args []string) (x int, y int, err error) {
+	if len(args) != 2 {
+		err = fmt.Errorf("invalid args")
+		return
+	}
+	if x, err = strconv.Atoi(args[0]); err != nil {
 		err = fmt.Errorf("first argument must be an int")
 		return
 	}
-	if y, err = strconv.Atoi(twoStrings[1]); err != nil {
+	if y, err = strconv.Atoi(args[1]); err != nil {
 		err = fmt.Errorf("second argument must be an int")
 		return
 	}
 	return
-}
-
-var commandNargs = map[string]int{
-	"g": 0,
-	"o": 2,
-	"f": 2,
-	"c": 2,
-	"r": 0,
-}
-
-func parseCommand(g *mines.GameState, c string) error {
-	parts := strings.Split(c, " ")
-
-	nargs, ok := commandNargs[parts[0]]
-	if !ok {
-		return fmt.Errorf("unknown command")
-	}
-	if nargs != len(parts)-1 {
-		return fmt.Errorf("invalid number of arguments")
-	}
-
-	switch parts[0] {
-	case "g":
-		return nil
-	case "o":
-		x, y, err := parseXY(parts[1:])
-		if err != nil {
-			return err
-		}
-		if !g.ValidatePoint(x, y) {
-			return fmt.Errorf("invalid square coordinates")
-		}
-		g.OpenCell(x, y)
-		return nil
-	case "f":
-		if x, y, err := parseXY(parts[1:]); err != nil {
-			return err
-		} else if !g.ValidatePoint(x, y) {
-			return fmt.Errorf("invalid square coordinates")
-		} else {
-			g.FlagCell(x, y)
-		}
-		return nil
-	case "c":
-		if x, y, err := parseXY(parts[1:]); err != nil {
-			return err
-		} else if !g.ValidatePoint(x, y) {
-			return fmt.Errorf("invalid square coordinates")
-		} else {
-			g.ChordCell(x, y)
-		}
-		return nil
-	case "r":
-		g.RevealMines()
-		return nil
-	}
-	return fmt.Errorf("invalid command")
-}
-
-func (g application) wsConnect(w http.ResponseWriter, r *http.Request) {
-	sessionId, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	session, err := g.repo.GetSession(r.Context(), sessionId)
-	if err == pgx.ErrNoRows {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		g.logger.Error("could not fetch session from db", slog.Any("error", err))
-		return
-	}
-
-	game, err := mines.ParseGameStateFromBytes(session.State)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	c, err := g.ws.Upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		g.logger.Error("unable to upgrade", slog.Any("error", err))
-		return
-	}
-
-	defer c.Close()
-
-	for {
-		mt, message, err := c.ReadMessage()
-		if err != nil {
-			if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				g.logger.Warn("abnormal ws break", slog.Any("error", err))
-			}
-			break
-		}
-		if mt != websocket.TextMessage {
-			break
-		}
-		text := strings.TrimSpace(string(message))
-		g.logger.Debug(fmt.Sprintf("\t> %s", text))
-		for _, c := range iterBySep(text, "\n") {
-			if err := parseCommand(game, c); err != nil {
-				g.logger.Error("unable to process command", slog.Any("error", err))
-				return
-			}
-			if game.Won || game.Dead {
-				*session.EndedAt = time.Now().UTC()
-				game.RevealMines()
-				break
-			}
-		}
-
-		b, err := game.Bytes()
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			g.logger.Error("unable to serialize game state", slog.Any("error", err))
-			return
-		}
-
-		err = g.repo.UpdateSession(r.Context(), repository.UpdateSessionParams{
-			GameSessionID: session.GameSessionID,
-			State:         b,
-			Dead:          game.Dead,
-			Won:           game.Won,
-			EndedAt:       session.EndedAt,
-		})
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			g.logger.Error("unable to update session in db", slog.Any("error", err))
-			return
-		}
-
-		if err := c.WriteJSON(session); err != nil {
-			g.logger.Error("unable to write json", slog.Any("error", err))
-			break
-		}
-		g.logger.Debug("\t< <session data>")
-	}
 }

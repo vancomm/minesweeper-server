@@ -53,7 +53,7 @@ func handleNewGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	params := mines.GameParams(gameParams)
-	if !params.ValidatePoint(posParams.X, posParams.Y) {
+	if !params.PointInBounds(posParams.X, posParams.Y) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -124,13 +124,13 @@ func handleOpen(w http.ResponseWriter, r *http.Request) {
 		log.Error(err)
 		return
 	}
-	if !session.State.ValidatePoint(posParams.X, posParams.Y) {
+	if !session.State.PointInBounds(posParams.X, posParams.Y) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	session.State.OpenCell(posParams.X, posParams.Y)
 	if session.State.Won || session.State.Dead {
-		session.State.RevealMines()
+		session.State.Forfeit()
 		session.EndedAt = time.Now().UTC()
 	}
 	if err := pg.UpdateGameSession(r.Context(), session); err != nil {
@@ -163,7 +163,7 @@ func handleFlag(w http.ResponseWriter, r *http.Request) {
 		log.Error(err)
 		return
 	}
-	if !session.State.ValidatePoint(posParams.X, posParams.Y) {
+	if !session.State.PointInBounds(posParams.X, posParams.Y) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -198,13 +198,13 @@ func handleChord(w http.ResponseWriter, r *http.Request) {
 		log.Error(err)
 		return
 	}
-	if !session.State.ValidatePoint(posParams.X, posParams.Y) {
+	if !session.State.PointInBounds(posParams.X, posParams.Y) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	session.State.ChordCell(posParams.X, posParams.Y)
 	if session.State.Won || session.State.Dead {
-		session.State.RevealMines()
+		session.State.Forfeit()
 		session.EndedAt = time.Now().UTC()
 	}
 	if err := pg.UpdateGameSession(r.Context(), session); err != nil {
@@ -231,7 +231,7 @@ func handleReveal(w http.ResponseWriter, r *http.Request) {
 		log.Error(err)
 		return
 	}
-	session.State.RevealAll()
+	session.State.RevealPlayerGrid()
 	if session.EndedAt.IsZero() {
 		session.EndedAt = time.Now().UTC()
 	}
@@ -290,7 +290,7 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if session.State.Won || session.State.Dead {
-			session.State.RevealMines()
+			session.State.Forfeit()
 			session.EndedAt = time.Now().UTC()
 			break
 		}

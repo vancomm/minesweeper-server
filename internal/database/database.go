@@ -43,7 +43,7 @@ func loadConfig() (*pgxpool.Config, error) {
 }
 
 func Connect(ctx context.Context) (*pgxpool.Pool, error) {
-	config, err := loadConfig()
+	config, err := loadConfig() // TODO move this to config package
 	if err != nil {
 		return nil, err
 	}

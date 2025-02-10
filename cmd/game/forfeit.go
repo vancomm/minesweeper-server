@@ -1,71 +1,77 @@
 package main
 
 import (
+	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/vancomm/minesweeper-server/internal/handlers"
 	"github.com/vancomm/minesweeper-server/internal/mines"
 	"github.com/vancomm/minesweeper-server/internal/repository"
 )
 
 func (app application) handleForfeit(w http.ResponseWriter, r *http.Request) {
-	sessionId, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	sessionId, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		app.notFound(w)
 		return
 	}
 
-	session, err := app.repo.GetSession(r.Context(), sessionId)
-	if err == pgx.ErrNoRows {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
+	session, err := app.repo.FetchGameSession(r.Context(), sessionId)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error("could not fetch session from db", "error", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			app.notFound(w)
+		} else {
+			app.internalError(w, "unable to fetch session from db", err)
+		}
 		return
 	}
 
-	playerId, ok := getAuthenticatedPlayerId(r)
-	if ok && session.PlayerID != nil && *session.PlayerID != playerId {
-		w.WriteHeader(http.StatusUnauthorized)
+	playerId, ok := app.getAuthenticatedPlayerId(r)
+	if ok && session.PlayerId != nil && *session.PlayerId != playerId {
+		app.unauthorized(w)
 		return
 	}
 
-	game, err := mines.ParseGameStateFromBytes(session.State)
+	game, err := mines.DecodeGameState(session.State)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		app.badRequest(w)
 		return
 	}
 
-	game.RevealAll()
-
-	if session.EndedAt == nil {
-		*session.EndedAt = time.Now().UTC()
+	game.RevealPlayerGrid()
+	if session.EndedAt.Time.IsZero() {
+		session.EndedAt.Time = time.Now().UTC()
 	}
 
 	b, err := game.Bytes()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error("unable to serialize game state", "error", err)
+		app.internalError(w, "unable to serialize game state", slog.Any("error", err))
 		return
 	}
 
-	err = app.repo.UpdateSession(r.Context(), repository.UpdateSessionParams{
-		GameSessionID: session.GameSessionID,
-		State:         b,
-		Dead:          game.Dead,
-		Won:           game.Won,
-		EndedAt:       session.EndedAt,
-	})
+	err = app.repo.UpdateGameSession(
+		r.Context(),
+		session.GameSessionId,
+		repository.UpdateGameSessionParams{
+			State:   &b,
+			Dead:    &game.Dead,
+			Won:     &game.Won,
+			EndedAt: &session.EndedAt.Time,
+		},
+	)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		app.logger.Error("unable to update session in db", "error", err)
+		app.internalError(w, "unable to update session in db", "error", err)
 		return
 	}
 
-	handlers.SendJSONOrLog(w, app.logger, session)
+	dto, err := NewGameSessionDTO(*session)
+	if err != nil {
+		app.internalError(w, "failed to create game session dto", slog.Any("error", err))
+		return
+	}
+
+	app.replyWith(w, dto)
 }

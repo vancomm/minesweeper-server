@@ -58,7 +58,7 @@ func handleConnectWs(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if session.State.Won || session.State.Dead {
-				session.State.RevealMines()
+				session.State.Forfeit()
 				session.EndedAt = time.Now().UTC()
 				break
 			}

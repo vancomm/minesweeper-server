@@ -5,8 +5,6 @@ import (
 	"math/rand/v2"
 	"reflect"
 	"slices"
-
-	"github.com/sirupsen/logrus"
 )
 
 type curiosity int
@@ -29,17 +27,17 @@ func (c curiosity) String() string {
 }
 
 /* Structure used internally to mineperturb(). */
-type square struct {
+type perturbCell struct {
 	x, y     int
 	priority curiosity
 	random   int32
 }
 
-func (s *square) String() string {
+func (s *perturbCell) String() string {
 	return fmt.Sprintf("%d:%d(%s)", s.x, s.y, s.priority.String())
 }
 
-func squarecmp(a, b *square) int {
+func perturbCellCmp(a, b *perturbCell) int {
 	if a.priority < b.priority {
 		return -1
 	}
@@ -67,31 +65,24 @@ func squarecmp(a, b *square) int {
 	return 0
 }
 
-func absDiff(x, y int) int {
-	if x > y {
-		return x - y
-	}
-	return y - x
-}
-
-type delta int8
+type perturbDelta int8
 
 const (
-	SetMine  delta = +1
-	SetClear delta = -1
+	perturbPlaceMine perturbDelta = +1
+	perturbClearMine perturbDelta = -1
 )
 
-func (d delta) String() string {
+func (d perturbDelta) String() string {
 	switch d {
-	case SetMine:
-		return "SetMine"
+	case perturbPlaceMine:
+		return "place mine"
 	default:
-		return "SetClear"
+		return "clear mine"
 	}
 }
 
-func (d delta) Mine() bool {
-	return d == SetMine
+func (d perturbDelta) PlacesMine() bool {
+	return d == perturbPlaceMine
 }
 
 /*
@@ -102,16 +93,18 @@ knowledge directly, but to efficently adjust its internal data
 structures and proceed based on only the information it
 legitimately has.
 */
-type change struct {
+type perturbChange struct {
 	x, y  int
-	delta delta /* +1 == become a mine; -1 == cleared */
+	delta perturbDelta /* +1 == become a mine; -1 == cleared */
 }
 
-func (p *change) String() string {
-	return fmt.Sprintf("%s@%d:%d", p.delta.String(), p.x, p.y)
+func (p *perturbChange) String() string {
+	return fmt.Sprintf("%s @ X:%d Y:%d", p.delta.String(), p.x, p.y)
 }
 
 /*
+panics [AssertionError]
+
 Normally this function is passed an (x,y,mask) set description.
 On occasions, though, there is no _localised_ set being used,
 and the set being perturbed is supposed to be the entirety of
@@ -128,11 +121,8 @@ grid quality I disable this feature for the first few attempts,
 and fall back to it after no useful grid has been generated.
 */
 func (ctx *mineCtx) Perturb(
-	grid *GridInfo,
-	setx, sety int,
-	mask word,
-	r *rand.Rand,
-) []*change {
+	grid *Grid, setX, setY int, mask word, r *rand.Rand,
+) []*perturbChange {
 	if mask == 0 && !ctx.allowBigPerturbs {
 		return nil
 	}
@@ -151,7 +141,7 @@ func (ctx *mineCtx) Perturb(
 	* We do this by preparing list of all squares and then sorting
 	* it with a random secondary key.
 	 */
-	squares := make([]*square, 0, ctx.width*ctx.height)
+	squares := make([]*perturbCell, 0, ctx.width*ctx.height)
 	for y := range ctx.height {
 		for x := range ctx.width {
 			/*
@@ -167,13 +157,13 @@ func (ctx *mineCtx) Perturb(
 			 * it on the list!
 			 */
 			if (mask == 0 && (*grid)[y*ctx.width+x] == Unknown) ||
-				(x >= setx && x < setx+3 &&
-					y >= sety && y < sety+3 &&
-					mask&(1<<((y-sety)*3+(x-setx))) != 0) {
+				(x >= setX && x < setX+3 &&
+					y >= setY && y < setY+3 &&
+					mask&(1<<((y-setY)*3+(x-setX))) != 0) {
 				continue
 			}
 
-			sq := &square{x: x, y: y}
+			sq := &perturbCell{x: x, y: y}
 
 			if (*grid)[y*ctx.width+x] != Unknown {
 				sq.priority = boring /* known square */
@@ -206,7 +196,7 @@ func (ctx *mineCtx) Perturb(
 		}
 	}
 
-	slices.SortFunc(squares, squarecmp)
+	slices.SortFunc(squares, perturbCellCmp)
 
 	/*
 	 * Now count up the number of full and empty squares in the set
@@ -219,12 +209,11 @@ func (ctx *mineCtx) Perturb(
 				if mask&(1<<(dy*3+dx)) != 0 {
 					// assert(setx+dx <= ctx->w);
 					// assert(sety+dy <= ctx->h);
-					if setx+dx > ctx.width || sety+dy > ctx.height {
-						Log.WithFields(logrus.Fields{
-							"dx": dx, "dy": dy, "ctx": ctx,
-						}).Fatal("out of range")
+					if setX+dx > ctx.width || setY+dy > ctx.height {
+						Log.Error("out of range", "dx", dx, "dy", dy, "ctx", ctx)
+						panic(AssertionError{"out of range"})
 					}
-					if ctx.MineAt(setx+dx, sety+dy) {
+					if ctx.MineAt(setX+dx, setY+dy) {
 						nfull++
 					} else {
 						nempty++
@@ -253,13 +242,13 @@ func (ctx *mineCtx) Perturb(
 	 * fill or empty the set while keeping the same number of mines
 	 * overall.
 	 */
-	var toFill, toEmpty []*square
+	var toFill, toEmpty []*perturbCell
 	if mask != 0 {
-		toFill = make([]*square, 0, 9)
-		toEmpty = make([]*square, 0, 9)
+		toFill = make([]*perturbCell, 0, 9)
+		toEmpty = make([]*perturbCell, 0, 9)
 	} else {
-		toFill = make([]*square, 0, ctx.width*ctx.height)
-		toEmpty = make([]*square, 0, ctx.width*ctx.height)
+		toFill = make([]*perturbCell, 0, ctx.width*ctx.height)
+		toEmpty = make([]*perturbCell, 0, ctx.width*ctx.height)
 	}
 	for _, sq := range squares {
 		if ctx.MineAt(sq.x, sq.y) {
@@ -288,9 +277,8 @@ func (ctx *mineCtx) Perturb(
 
 	if len(toFill) != nfull && len(toEmpty) != nempty {
 		if len(toEmpty) == 0 { // assert(ntoempty != 0)
-			Log.WithFields(logrus.Fields{
-				"toEmpty": toEmpty, "toFill": toFill,
-			}).Fatal("invalid state")
+			Log.Error("toEmpty cannot be empty", "toEmpty", toEmpty, "toFill", toFill)
+			panic(AssertionError{"toEmpty cannot be empty"})
 		}
 
 		setlist = make([]int, 0, ctx.width*ctx.height)
@@ -301,13 +289,12 @@ func (ctx *mineCtx) Perturb(
 					if mask&(1<<(dy*3+dx)) != 0 {
 						// assert(setx+dx <= ctx->w);
 						// assert(sety+dy <= ctx->h);
-						if setx+dx > ctx.width || sety+dy > ctx.height {
-							Log.WithFields(logrus.Fields{
-								"dx": dx, "dy": dy, "ctx": ctx,
-							}).Fatal("out of range")
+						if setX+dx > ctx.width || setY+dy > ctx.height {
+							Log.Error("out of range", "dx", dx, "dy", dy, "ctx", ctx)
+							panic(AssertionError{"out of range"})
 						}
-						if !ctx.MineAt(setx+dx, sety+dy) {
-							setlist = append(setlist, (sety+dy)*ctx.width+(setx+dx))
+						if !ctx.MineAt(setX+dx, setY+dy) {
+							setlist = append(setlist, (setY+dy)*ctx.width+(setX+dx))
 						}
 					}
 				}
@@ -326,11 +313,10 @@ func (ctx *mineCtx) Perturb(
 
 		// assert(i > ntoempty)
 		if (len(setlist)) <= len(toEmpty) {
-			Log.WithFields(logrus.Fields{
-				"setlist": setlist,
-				"toEmpty": toEmpty,
-				"toFill":  toFill,
-			}).Fatal("setlist cannot be smaller than toEmpty")
+			Log.Error("setlist cannot be smaller than toEmpty", "setlist", setlist,
+				"toEmpty", toEmpty,
+				"toFill", toFill)
+			panic(AssertionError{"setlist cannot be smaller than toEmpty"})
 		}
 
 		/*
@@ -357,13 +343,13 @@ func (ctx *mineCtx) Perturb(
 	 * efficiently rather than having to rescan the whole grid.
 	 */
 	var (
-		todos       []*square
-		dTodo, dSet delta
+		todos       []*perturbCell
+		dTodo, dSet perturbDelta
 	)
 	if len(toFill) == nfull {
 		todos = toFill
-		dTodo = SetMine
-		dSet = SetClear
+		dTodo = perturbPlaceMine
+		dSet = perturbClearMine
 		toEmpty = nil
 	} else {
 		/*
@@ -371,14 +357,14 @@ func (ctx *mineCtx) Perturb(
 		 * setlist.)
 		 */
 		todos = toEmpty
-		dTodo = SetClear
-		dSet = SetMine
+		dTodo = perturbClearMine
+		dSet = perturbPlaceMine
 		toFill = nil
 	}
 
-	changes := make([]*change, 0, 2*len(todos)) // originally snewn(2 * ntodo, struct perturbation)
+	changes := make([]*perturbChange, 0, 2*len(todos)) // originally snewn(2 * ntodo, struct perturbation)
 	for _, t := range todos {
-		changes = append(changes, &change{
+		changes = append(changes, &perturbChange{
 			x:     t.x,
 			y:     t.y,
 			delta: dTodo,
@@ -388,13 +374,12 @@ func (ctx *mineCtx) Perturb(
 	if setlist != nil {
 		// assert(todo == toempty)
 		if !reflect.DeepEqual(todos, toEmpty) {
-			Log.WithFields(logrus.Fields{
-				"todos": todos, "toEmpty": toEmpty,
-			}).Fatal("must be equal")
+			Log.Error("todo must deep equal toEmpty", "todos", todos, "toEmpty", toEmpty)
+			panic(AssertionError{"todo must deep equal toEmpty"})
 		}
 
 		for j := range toEmpty {
-			changes = append(changes, &change{
+			changes = append(changes, &perturbChange{
 				x:     setlist[j] % ctx.width,
 				y:     setlist[j] / ctx.width,
 				delta: dSet,
@@ -405,16 +390,16 @@ func (ctx *mineCtx) Perturb(
 		for dy := range 3 {
 			for dx := range 3 {
 				if mask&(1<<(dy*3+dx)) != 0 {
-					var currval delta
-					if ctx.MineAt(setx+dx, sety+dy) {
-						currval = SetMine
+					var currval perturbDelta
+					if ctx.MineAt(setX+dx, setY+dy) {
+						currval = perturbPlaceMine
 					} else {
-						currval = SetClear
+						currval = perturbClearMine
 					}
 					if dSet == -currval {
-						changes = append(changes, &change{
-							x:     setx + dx,
-							y:     sety + dy,
+						changes = append(changes, &perturbChange{
+							x:     setX + dx,
+							y:     setY + dy,
 							delta: dSet,
 						})
 					}
@@ -425,14 +410,14 @@ func (ctx *mineCtx) Perturb(
 		for y := range ctx.height {
 			for x := range ctx.width {
 				if (*grid)[y*ctx.width+x] == Unknown {
-					var currval delta
+					var currval perturbDelta
 					if ctx.MineAt(x, y) {
-						currval = SetMine
+						currval = perturbPlaceMine
 					} else {
-						currval = SetClear
+						currval = perturbClearMine
 					}
 					if dSet == -currval {
-						changes = append(changes, &change{
+						changes = append(changes, &perturbChange{
 							x:     x,
 							y:     y,
 							delta: dSet,
@@ -445,9 +430,8 @@ func (ctx *mineCtx) Perturb(
 
 	// assert(i == ret->n)
 	if len(changes) != 2*len(todos) {
-		Log.WithFields(logrus.Fields{
-			"todos": todos, "perturbs": changes,
-		}).Fatal("some perturbations have not generated")
+		Log.Error("not all perturbations have generated", "todos", todos, "changes", changes)
+		panic(AssertionError{"not all perturbations have generated"})
 	}
 
 	squares = nil
@@ -469,17 +453,16 @@ func (ctx *mineCtx) Perturb(
 		 * an absent one.
 		 */
 		// assert((delta < 0) ^ (ctx->grid[y*ctx->w+x] == 0))
-		if delta.Mine() == ctx.MineAt(x, y) {
-			Log.WithFields(logrus.Fields{
-				"change": c,
-				"mine":   ctx.MineAt(x, y),
-			}).Fatal("trying to add an existing mine or remove an absent one")
+		if delta.PlacesMine() == ctx.MineAt(x, y) {
+			Log.Error("trying to add an existing mine or remove an absent one",
+				"change", c, "mine", ctx.MineAt(x, y))
+			panic(AssertionError{"trying to add an existing mine or remove an absent one"})
 		}
 
 		/*
 		 * Actually make the change.
 		 */
-		ctx.grid[y*ctx.width+x] = delta.Mine()
+		ctx.grid[y*ctx.width+x] = delta.PlacesMine()
 
 		/*
 		 * Update any numbers already present in the grid.
@@ -495,10 +478,10 @@ func (ctx *mineCtx) Perturb(
 						 * the grid. Mark it as a mine if it's a
 						 * mine, or else work out its number.
 						 */
-						if delta == SetMine {
-							(*grid)[y*ctx.width+x] = Flag
+						if delta == perturbPlaceMine {
+							(*grid)[y*ctx.width+x] = Flagged
 						} else {
-							var minecount CellStatus = 0
+							var minecount CellState = 0
 							for dy2 := -1; dy2 <= +1; dy2++ {
 								for dx2 := -1; dx2 <= +1; dx2++ {
 									if x+dx2 >= 0 && x+dx2 < ctx.width &&
@@ -512,7 +495,7 @@ func (ctx *mineCtx) Perturb(
 						}
 					} else {
 						if (*grid)[(y+dy)*ctx.width+(x+dx)] >= 0 {
-							(*grid)[(y+dy)*ctx.width+(x+dx)] += CellStatus(delta)
+							(*grid)[(y+dy)*ctx.width+(x+dx)] += CellState(delta)
 						}
 					}
 				}

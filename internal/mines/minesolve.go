@@ -35,6 +35,8 @@ func (r solveResult) String() string {
 }
 
 /*
+panics [AssertionError]
+
 Main solver entry point. You give it a grid of existing
 knowledge (-1 for a square known to be a mine, 0-8 for empty
 squares with a given number of neighbours, -2 for completely
@@ -52,7 +54,7 @@ Return value is:
 */
 func mineSolve(
 	w, h, n int,
-	grid GridInfo,
+	grid Grid,
 	ctx *mineCtx,
 	r *rand.Rand,
 ) solveResult {
@@ -63,7 +65,7 @@ func mineSolve(
 	 * Set up a linked list of squares with known contents, so that
 	 * we can process them one by one.
 	 */
-	std := &squaretodo{
+	std := &celltodo{
 		next: make([]int, w*h),
 		head: -1,
 		tail: -1,
@@ -115,7 +117,7 @@ func mineSolve(
 					for dx := -1; dx <= +1; dx++ {
 						if x+dx < 0 || x+dx >= w || y+dy < 0 || y+dy >= h {
 							/* ignore this one */
-						} else if grid[i+dy*w+dx] == Flag {
+						} else if grid[i+dy*w+dx] == Flagged {
 							mines--
 						} else if grid[i+dy*w+dx] == Unknown {
 							val |= bit
@@ -146,7 +148,7 @@ func mineSolve(
 					 * Compute the new mine count.
 					 */
 					newmines := s.mines
-					if grid[i] == Flag {
+					if grid[i] == Flagged {
 						newmines--
 					}
 
@@ -187,7 +189,7 @@ func mineSolve(
 				 * If so, we can immediately mark all the squares
 				 * in the set as known.
 				 */
-				grid.knownSquares(w, std, ctx, s.x, s.y, s.mask, s.mines != 0)
+				grid.knownCells(w, std, ctx, s.x, s.y, s.mask, s.mines != 0)
 
 				/*
 				 * Having done that, we need do nothing further
@@ -228,10 +230,10 @@ func mineSolve(
 				 * every square in the other wing as known clear.
 				 */
 				if (swc == s.mines-s2.mines) || (s2wc == s2.mines-s.mines) {
-					grid.knownSquares(w, std, ctx,
+					grid.knownCells(w, std, ctx,
 						s.x, s.y, swing,
 						(swc == s.mines-s2.mines))
-					grid.knownSquares(w, std, ctx,
+					grid.knownCells(w, std, ctx,
 						s2.x, s2.y, s2wing,
 						(s2wc == s2.mines-s.mines))
 					continue
@@ -282,7 +284,7 @@ func mineSolve(
 			squaresleft := 0
 			minesleft := n
 			for i := range w * h {
-				if grid[i] == Flag {
+				if grid[i] == Flagged {
 					minesleft--
 				} else if grid[i] == Unknown {
 					squaresleft++
@@ -305,7 +307,7 @@ func mineSolve(
 			if minesleft == 0 || minesleft == squaresleft {
 				for i := range w * h {
 					if grid[i] == Unknown {
-						grid.knownSquares(w, std, ctx,
+						grid.knownCells(w, std, ctx,
 							i%w, i/w, 1, minesleft != 0)
 					}
 				}
@@ -441,7 +443,7 @@ func mineSolve(
 										}
 									}
 									if outside {
-										grid.knownSquares(
+										grid.knownCells(
 											w, std, ctx,
 											x, y, 1, minesleft != 0,
 										)
@@ -498,7 +500,7 @@ func mineSolve(
 		 * make it easier.
 		 */
 		nperturbs++
-		var changes []*change
+		var changes []*perturbChange
 
 		/*
 		 * Choose a set at random from the current selection,

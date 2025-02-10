@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -18,24 +18,6 @@ type application struct {
 	jwt      *config.JWT
 }
 
-var (
-	ErrBadAuthBody        = fmt.Errorf("request body must contain url-encoded username and password")
-	ErrBadPasswordTooLong = fmt.Errorf("password too long")
-	ErrUsernameTaken      = fmt.Errorf("username taken")
-)
-
-func (app *application) auth(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		claims, err := app.cookies.ParsePlayerClaims(r)
-		if err != nil {
-			r.Header.Add("X-Player-ID", "anon")
-		} else {
-			r.Header.Add("X-Player-ID", strconv.FormatInt(claims.PlayerId, 10))
-		}
-		next(w, r)
-	}
-}
-
 func (app application) ServeMux() *http.ServeMux {
 	base := app.basePath
 	mux := http.NewServeMux()
@@ -43,6 +25,9 @@ func (app application) ServeMux() *http.ServeMux {
 	mux.HandleFunc("POST "+base+"/login", app.handleLogin)
 	mux.HandleFunc("POST "+base+"/register", app.handleRegister)
 
+	mux.Handle(base+"/game", http.StripPrefix(base+"/game",
+		http.Handler(app.auth(app.proxy("http://game:8080")))),
+	)
 	mux.Handle(base+"/game/", http.StripPrefix(base+"/game",
 		http.Handler(app.auth(app.proxy("http://game:8080")))),
 	)
@@ -53,4 +38,56 @@ func (app application) ServeMux() *http.ServeMux {
 	})
 
 	return mux
+}
+
+func (app *application) auth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Header.Del("X-Player-ID")
+		claims, err := app.cookies.ParsePlayerClaims(r)
+		if err != nil {
+			r.Header.Add("X-Player-ID", "anon")
+		} else {
+			r.Header.Add("X-Player-ID", strconv.Itoa(claims.PlayerId))
+		}
+		next(w, r)
+	}
+}
+
+func (app application) badRequest(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusBadRequest)
+	w.Write([]byte("your request is invalid"))
+}
+
+func (app application) unauthorized(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusUnauthorized)
+	w.Write([]byte("you are not allowed to execute this operation"))
+
+}
+
+func (app application) internalError(w http.ResponseWriter, msg string, args ...any) {
+	w.WriteHeader(http.StatusInternalServerError)
+	w.Write([]byte("internal error"))
+	app.logger.Error(msg, args...)
+}
+
+func (app application) badGateway(w http.ResponseWriter, msg string, args ...any) {
+	w.WriteHeader(http.StatusBadGateway)
+	w.Write([]byte("failed to make proxy request"))
+	app.logger.Error(msg, args...)
+}
+
+func (app application) replyWith(w http.ResponseWriter, v any) {
+	payload, err := json.Marshal(v)
+	if err != nil {
+		app.internalError(w, "failed to marshal json", err)
+		return
+	}
+	_, err = w.Write(payload)
+	if err != nil {
+		app.logger.Error(
+			"failed to send data",
+			slog.Any("data", v),
+			slog.Any("error", err),
+		)
+	}
 }

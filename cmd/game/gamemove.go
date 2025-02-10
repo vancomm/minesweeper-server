@@ -28,7 +28,7 @@ func init() {
 	)
 }
 
-func ParseGameMove(s string) (move GameMove, err error) {
+func decodeGameMove(s string) (move GameMove, err error) {
 	switch strings.ToLower(s) {
 	case "open":
 		move = Open

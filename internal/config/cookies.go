@@ -18,12 +18,12 @@ type Cookies struct {
 }
 
 type PlayerClaims struct {
-	PlayerId int64  `json:"player_id"`
+	PlayerId int    `json:"player_id"`
 	Username string `json:"username"`
 	jwt.RegisteredClaims
 }
 
-func NewPlayerClaims(playerId int64, username string) *PlayerClaims {
+func NewPlayerClaims(playerId int, username string) *PlayerClaims {
 	return &PlayerClaims{
 		PlayerId: playerId,
 		Username: username,

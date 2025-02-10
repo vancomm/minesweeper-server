@@ -52,7 +52,7 @@ type setstore struct {
 
 func newSetStore() *setstore {
 	return &setstore{
-		sets:      tree234.New(setcmp),
+		sets:      tree234.NewTree234(setcmp),
 		todo_head: nil, todo_tail: nil,
 	}
 }
@@ -72,9 +72,10 @@ func (ss *setstore) addTodo(s *set) {
 	s.todo = true
 }
 
+// panics [AssertionError]
 func (ss *setstore) add(x, y int, mask word, mines int) {
 	if mask == 0 { // assert mask != 0
-		Log.Fatal("mask cannot be 0")
+		panic(AssertionError{"mask cannot be 0"})
 	}
 
 	/*

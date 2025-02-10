@@ -5,50 +5,27 @@ package mines
 import (
 	"bytes"
 	"encoding/gob"
-	"log"
+	"errors"
+	"log/slog"
 	"math/rand/v2"
-
-	"github.com/sirupsen/logrus"
 )
 
-var Log = logrus.New()
+var Log *slog.Logger = slog.Default()
 
 type GameState struct {
-	GameParams
 	Dead, Won, UsedSolve bool
-	Grid                 []bool   /* real mine points */
-	PlayerGrid           GridInfo /* player knowledge */
-	/*
-	 * Each item in the `grid' array is one of the following values:
-	 *
-	 * 	- 0 to 8 mean the square is open and has a surrounding mine
-	 * 	  count.
-	 *
-	 *  - -1 means the square is marked as a mine.
-	 *
-	 *  - -2 means the square is unknown.
-	 *
-	 * 	- -3 means the square is marked with a question mark
-	 * 	  (FIXME: do we even want to bother with this?).
-	 *
-	 * 	- 64 means the square has had a mine revealed when the game
-	 * 	  was lost.
-	 *
-	 * 	- 65 means the square had a mine revealed and this was the
-	 * 	  one the player hits.
-	 *
-	 * 	- 66 means the square has a crossed-out mine because the
-	 * 	  player had incorrectly marked it.
-	 */
+	Grid                 []bool /* real mine points */
+	PlayerGrid           Grid   /* player knowledge */
+	GameParams
 }
 
-func ParseGameStateFromBytes(buf []byte) (*GameState, error) {
-	var game *GameState
-	err := gob.NewDecoder(bytes.NewBuffer(buf)).Decode(game)
+func DecodeGameState(buf []byte) (*GameState, error) {
+	var game GameState
+	err := gob.NewDecoder(bytes.NewBuffer(buf)).Decode(&game)
 	if err != nil {
 		return nil, err
 	}
-	return game, nil
+	return &game, err
 }
 
 func (g GameState) Bytes() ([]byte, error) {
@@ -60,22 +37,33 @@ func (g GameState) Bytes() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func NewGame(params *GameParams, x, y int, r *rand.Rand) (*GameState, error) {
-	grid, err := params.generate(x, y, r)
+func NewGame(params *GameParams, x, y int, r *rand.Rand) (state *GameState, err error) {
+	defer func() {
+		var ae AssertionError
+		if r := recover(); r != nil {
+			if e, ok := r.(error); ok {
+				if errors.As(e, &ae) {
+					state, err = nil, ae
+				}
+			}
+		}
+	}()
+
+	grid, err := params.newSolvableGrid(x, y, r)
 	if err != nil {
 		return nil, err
 	}
-	playerGrid := make(GridInfo, len(grid))
+	playerGrid := make(Grid, len(grid))
 	for i := range playerGrid {
 		playerGrid[i] = Unknown
 	}
-	state := &GameState{
+	state = &GameState{
 		GameParams: *params,
 		Grid:       grid,
 		PlayerGrid: playerGrid,
 	}
 	if state.OpenCell(x, y) != 0 {
-		log.Fatalf("mine in or around starting square")
+		return nil, AssertionError{"mine in starting cell"}
 	}
 	return state, err
 }
@@ -124,9 +112,7 @@ func (s *GameState) OpenCell(x, y int) int {
 							}
 						}
 					}
-
-					s.PlayerGrid[yy*s.Width+xx] = CellStatus(v)
-
+					s.PlayerGrid[yy*s.Width+xx] = CellState(v)
 					if v == 0 {
 						for dx := -1; dx <= 1; dx++ {
 							for dy := -1; dy <= 1; dy++ {
@@ -140,7 +126,6 @@ func (s *GameState) OpenCell(x, y int) int {
 							}
 						}
 					}
-
 					doneSomething = true
 				}
 			}
@@ -190,8 +175,8 @@ func (s *GameState) OpenCell(x, y int) int {
 func (s *GameState) FlagCell(x, y int) {
 	i := y*s.Width + x
 	if s.PlayerGrid[i] == Unknown {
-		s.PlayerGrid[i] = Flag
-	} else if s.PlayerGrid[i] == Flag {
+		s.PlayerGrid[i] = Flagged
+	} else if s.PlayerGrid[i] == Flagged {
 		s.PlayerGrid[i] = Unknown
 	}
 }
@@ -210,7 +195,7 @@ func (s *GameState) ChordCell(x, y int) {
 				0 <= y+dy && y+dy < s.Height &&
 				(dx != 0 || dy != 0) {
 				j := (y+dy)*s.Width + (x + dx)
-				if s.PlayerGrid[j] == Flag {
+				if s.PlayerGrid[j] == Flagged {
 					m++
 				} else if s.PlayerGrid[j] == Unknown {
 					js = append(js, j)
@@ -230,34 +215,23 @@ func (s *GameState) ChordCell(x, y int) {
 	}
 }
 
-func (s *GameState) RevealMines() {
+func (s *GameState) Forfeit() {
 	if !(s.Dead || s.Won) {
 		s.Dead = true
 	}
-	for i, mine := range s.Grid {
-		if s.PlayerGrid[i] == Unknown && mine {
-			s.PlayerGrid[i] = UnflaggedMine
-		}
-		if s.PlayerGrid[i] == Flag {
-			if mine {
-				s.PlayerGrid[i] = CorrectFlag
-			} else {
-				s.PlayerGrid[i] = WrongFlag
-			}
-		}
-	}
+	s.RevealPlayerGrid()
 }
 
-func (s *GameState) RevealAll() {
+func (s *GameState) RevealPlayerGrid() {
 	if !(s.Dead || s.Won) {
 		s.Dead = true
 	}
 	for i := range s.Grid {
-		if s.PlayerGrid[i] == Flag {
+		if s.PlayerGrid[i] == Flagged {
 			if s.Grid[i] {
-				s.PlayerGrid[i] = CorrectFlag
+				s.PlayerGrid[i] = CorrectlyFlagged
 			} else {
-				s.PlayerGrid[i] = WrongFlag
+				s.PlayerGrid[i] = FalselyFlagged
 			}
 		} else if s.PlayerGrid[i] == Unknown || s.PlayerGrid[i] == Question {
 			if s.Grid[i] {
@@ -275,7 +249,7 @@ func (s *GameState) RevealAll() {
 						}
 					}
 				}
-				s.PlayerGrid[i] = CellStatus(c)
+				s.PlayerGrid[i] = CellState(c)
 			}
 		}
 	}

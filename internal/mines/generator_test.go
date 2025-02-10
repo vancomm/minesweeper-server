@@ -9,11 +9,6 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	// Log.SetLevel(logrus.DebugLevel)
-	Log.SetFormatter(&logrus.TextFormatter{
-		DisableTimestamp: true,
-	})
-	// tree234.Log.SetLevel(logrus.DebugLevel)
 	tree234.Log.SetFormatter(&logrus.TextFormatter{
 		DisableTimestamp: true,
 	})
@@ -65,7 +60,7 @@ func TestGenAll(t *testing.T) {
 			for sx := 0; sx < params.Width; sx++ {
 				for sy := 0; sy < params.Height; sy++ {
 					t.Logf("%s @ %d:%d", test.name, sx, sy)
-					_, err := params.generate(sx, sy, r)
+					_, err := params.newSolvableGrid(sx, sy, r)
 					if err != nil {
 						t.Log(err)
 						t.Errorf("could not generate game field %s", test.name)

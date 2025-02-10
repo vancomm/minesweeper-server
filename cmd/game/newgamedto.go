@@ -9,7 +9,7 @@ type NewGame struct {
 	Unique    bool `schema:"unique,required"`
 }
 
-func ParseNewGame(src map[string][]string) (NewGame, error) {
+func decodeNewGame(src map[string][]string) (NewGame, error) {
 	dec := schema.NewDecoder()
 	dec.IgnoreUnknownKeys(true)
 	var dto NewGame

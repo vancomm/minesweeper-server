@@ -7,7 +7,7 @@ type point struct {
 	Y int `schema:"y,required"`
 }
 
-func parsePoint(src map[string][]string) (point, error) {
+func decodePoint(src map[string][]string) (point, error) {
 	pointDecoder := schema.NewDecoder()
 	pointDecoder.IgnoreUnknownKeys(true)
 	var p point

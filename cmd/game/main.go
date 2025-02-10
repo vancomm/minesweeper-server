@@ -28,7 +28,10 @@ func createRand() *rand.Rand {
 func main() {
 	var logger *slog.Logger
 	if config.Development() {
-		logger = slog.New(tint.NewHandler(os.Stderr, nil))
+		logger = slog.New(
+			tint.NewHandler(os.Stderr, &tint.Options{Level: slog.LevelDebug}),
+		)
+
 	} else {
 		logger = slog.New(slog.NewJSONHandler(os.Stderr, nil))
 	}
