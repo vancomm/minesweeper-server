@@ -4,13 +4,12 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	"github.com/jackc/pgx/v5"
 )
 
 func (app application) handleFetchGame(w http.ResponseWriter, r *http.Request) {
-	sessionId, err := strconv.Atoi(r.PathValue("id"))
+	sessionId, err := app.getSessionId(r)
 	if err != nil {
 		app.notFound(w)
 		return
@@ -37,5 +36,5 @@ func (app application) handleFetchGame(w http.ResponseWriter, r *http.Request) {
 		app.internalError(w, "failed to create game session dto", slog.Any("error", err))
 	}
 
-	app.replyWith(w, dto)
+	app.replyWithJSON(w, dto)
 }

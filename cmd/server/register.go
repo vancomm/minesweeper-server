@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -44,7 +45,7 @@ func (app *application) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.As(err, &pgErr) && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
 			w.WriteHeader(http.StatusConflict)
-			app.replyWith(w, map[string]string{"error": "username taken"})
+			app.replyWithJSON(w, map[string]string{"error": "username taken"})
 			return
 		}
 		app.internalError(w, "unable to insert player", "error", err)
@@ -59,11 +60,11 @@ func (app *application) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = app.cookies.Refresh(w, token)
+	err = app.cookies.Refresh(w, token, time.Now().Add(app.jwt.TokenLifetime))
 	if err != nil {
 		app.internalError(w, "failed to set auth cookies", "error", err)
 		return
 	}
 
-	app.replyWith(w, "ok")
+	app.replyWithJSON(w, "ok")
 }

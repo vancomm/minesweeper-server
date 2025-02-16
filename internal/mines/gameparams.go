@@ -7,17 +7,11 @@ import (
 	"strings"
 )
 
-/* ----------------------------------------------------------------------
- * Grid generator which uses the [above] solver.
- */
-
 type GameParams struct {
-	Width, Height, MineCount int
-	Unique                   bool
-}
-
-func (p GameParams) Unpack() (w int, h int, mc int, u bool) {
-	return p.Width, p.Height, p.MineCount, p.Unique
+	Width     int
+	Height    int
+	MineCount int
+	Unique    bool
 }
 
 func (p GameParams) Seed() string {
@@ -28,7 +22,15 @@ func (p GameParams) Seed() string {
 	return fmt.Sprintf("%d:%d:%d:%d", p.Width, p.Height, p.MineCount, u)
 }
 
-func ParseSeed(seed string) (*GameParams, error) {
+func (p GameParams) Unpack() (w int, h int, mc int, u bool) {
+	return p.Width, p.Height, p.MineCount, p.Unique
+}
+
+func (p GameParams) PointInBounds(x, y int) bool {
+	return y*p.Width+x < p.Width*p.Height
+}
+
+func ParseGameSeed(seed string) (*GameParams, error) {
 	p := &GameParams{}
 	u := 0
 	sseed := strings.ReplaceAll(seed, ":", " ")
@@ -43,8 +45,4 @@ func ParseSeed(seed string) (*GameParams, error) {
 	}
 	p.Unique = u == 1
 	return p, nil
-}
-
-func (p GameParams) PointInBounds(x, y int) bool {
-	return y*p.Width+x < p.Width*p.Height
 }

@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash/maphash"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/lmittmann/tint"
 	"github.com/vancomm/minesweeper-server/internal/config"
 	"github.com/vancomm/minesweeper-server/internal/database"
@@ -17,19 +20,28 @@ import (
 	"github.com/vancomm/minesweeper-server/internal/repository"
 )
 
-func main() {
-	var logger *slog.Logger
-	if config.Development() {
-		logger = slog.New(
-			tint.NewHandler(os.Stderr, &tint.Options{Level: slog.LevelDebug}),
-		)
+func createRand() *rand.Rand {
+	return rand.New(rand.NewPCG(
+		new(maphash.Hash).Sum64(), new(maphash.Hash).Sum64(),
+	))
+}
 
-	} else {
-		logger = slog.New(slog.NewJSONHandler(os.Stderr, nil))
+func main() {
+	var handler slog.Handler = slog.NewJSONHandler(os.Stderr, nil)
+	if config.Development() {
+		handler = tint.NewHandler(os.Stderr, &tint.Options{
+			Level: slog.LevelDebug,
+		})
 	}
+	logger := slog.New(handler)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
+
+	db, err := database.Connect(ctx)
+	if err != nil {
+		logger.Error("failed to connect and migrate db", "error", err)
+	}
 
 	cookies, err := config.NewCookies()
 	if err != nil {
@@ -43,26 +55,33 @@ func main() {
 		return
 	}
 
-	db, err := database.Connect(ctx)
+	ws, err := config.NewWebSocket()
 	if err != nil {
-		logger.Error("failed to connect and migrate db", "error", err)
+		logger.Error("failed to read ws config", "error", err)
+		return
 	}
 
 	port := config.Port()
-	basePath := config.BasePath()
-	app := &application{
-		basePath: basePath,
-		logger:   logger,
-		repo:     repository.New(db),
-		cookies:  cookies,
-		jwt:      jwt,
-	}
-	server := &http.Server{
-		Addr:    port,
-		Handler: middleware.Logging(logger)(app.ServeMux()),
-	}
-	errCh := make(chan error, 1)
 
+	app := &application{
+		logger:  logger,
+		repo:    repository.New(db),
+		ws:      ws,
+		cookies: cookies,
+		jwt:     jwt,
+		rnd:     createRand(),
+	}
+	router := app.Router()
+	router.Use(mux.CORSMethodMiddleware(router), middleware.Logging(logger))
+	server := &http.Server{
+		Addr:         port,
+		WriteTimeout: time.Second * 15,
+		ReadTimeout:  time.Second * 15,
+		IdleTimeout:  time.Second * 60,
+		Handler:      router,
+	}
+
+	errCh := make(chan error, 1)
 	go func() {
 		err := server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -71,14 +90,13 @@ func main() {
 		close(errCh)
 	}()
 
-	logger.Info("gateway online", slog.String("port", port), slog.String("base path", basePath))
-	logger.Info("app available at http://localhost" + port + basePath + "/status")
+	logger.Info(fmt.Sprintf("minesweeper server listening at http://localhost%s", port))
 
 	select {
 	case <-ctx.Done():
 		break
 	case err := <-errCh:
-		logger.Error("failed to start", "error", err)
+		logger.Error("failed to start", slog.Any("error", err))
 		os.Exit(1)
 	}
 

@@ -45,18 +45,16 @@ services:
       - POSTGRES_PORT=5432
       - POSTGRES_SSLMODE=disable
 
-  gateway:
+  server:
     build:
       context: ..
       dockerfile: build/Dockerfile.live
-      target: gateway
-    image: vancomm/mines-gateway:live
-    container_name: mines-gateway
+    image: vancomm/mines-server:live
+    container_name: mines-server
     ports:
       - "8080:8080"
     links:
       - db
-      - game
     depends_on:
       db:
         condition: service_healthy
@@ -74,40 +72,11 @@ services:
       - POSTGRES_DB=app
       - POSTGRES_PORT=5432
       - POSTGRES_SSLMODE=disable
-      - COOKIES_DOMAIN=""
-      - COOKIES_SECURE=""
-      - COOKIES_SAMESITE=none
+      - COOKIES_DOMAIN=
+      - COOKIES_SECURE=1
+      - COOKIES_SAMESITE=strict
       - JWT_PRIVATE_KEY_FILE=/app/run/secrets/jwt-private-key.pem
       - JWT_PUBLIC_KEY_FILE=/app/run/secrets/jwt-public-key.pem
-
-  game:
-    build:
-      context: ..
-      dockerfile: build/Dockerfile.live
-      target: game
-    image: vancomm/mines-game:live
-    container_name: mines-game
-    links:
-      - db
-    depends_on:
-      db:
-        condition: service_healthy
-      migrator:
-        condition: service_completed_successfully
-    volumes:
-      - ../:/app
-    environment:
-      - APP_PORT=:8080
-      - DEVELOPMENT=1
-      - POSTGRES_HOST=db
-      - POSTGRES_PASSWORD=5uL3KkJrlViMQoqR
-      - POSTGRES_USER=postgres
-      - POSTGRES_DB=app
-      - POSTGRES_PORT=5432
-      - POSTGRES_SSLMODE=disable
-      - COOKIES_DOMAIN=""
-      - COOKIES_SECURE=""
-      - COOKIES_SAMESITE=none
 
 volumes:
   db_data:

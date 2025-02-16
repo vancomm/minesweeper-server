@@ -1,19 +1,21 @@
 package main
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/vancomm/minesweeper-server/internal/mines"
 	"github.com/vancomm/minesweeper-server/internal/repository"
 )
 
-func (app application) handleFetchHighScores(w http.ResponseWriter, r *http.Request) {
+func (app application) handleFetchHighScore(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	filter := repository.HighscoreFilter{}
 
 	if query.Has("seed") {
-		gameParams, err := mines.ParseSeed(query.Get("seed"))
+		gameParams, err := mines.ParseGameSeed(query.Get("seed"))
 		if err != nil {
 			app.badRequest(w)
 			return
@@ -26,11 +28,12 @@ func (app application) handleFetchHighScores(w http.ResponseWriter, r *http.Requ
 	}
 
 	highscores, err := app.repo.GetHighscores(r.Context(), filter)
-	if err != nil {
-		app.internalError(w, "failed to fetch highscores",
-			slog.Any("err", err), slog.Any("filter", filter))
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		app.internalError(w,
+			"failed to fetch highscores", slog.Any("err", err), slog.Any("filter", filter),
+		)
 		return
 	}
 
-	app.replyWith(w, highscores)
+	app.replyWithJSON(w, highscores)
 }

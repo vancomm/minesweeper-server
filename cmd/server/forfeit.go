@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -13,7 +12,7 @@ import (
 )
 
 func (app application) handleForfeit(w http.ResponseWriter, r *http.Request) {
-	sessionId, err := strconv.Atoi(r.PathValue("id"))
+	sessionId, err := app.getSessionId(r)
 	if err != nil {
 		app.notFound(w)
 		return
@@ -52,7 +51,7 @@ func (app application) handleForfeit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = app.repo.UpdateGameSession(
+	session, err = app.repo.UpdateGameSession(
 		r.Context(),
 		session.GameSessionId,
 		repository.UpdateGameSessionParams{
@@ -73,5 +72,5 @@ func (app application) handleForfeit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app.replyWith(w, dto)
+	app.replyWithJSON(w, dto)
 }

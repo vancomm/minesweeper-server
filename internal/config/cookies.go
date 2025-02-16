@@ -14,7 +14,6 @@ type Cookies struct {
 	Domain   string
 	Secure   bool
 	SameSite http.SameSite
-	jwt      JWT
 }
 
 type PlayerClaims struct {
@@ -40,7 +39,7 @@ func NewCookies() (*Cookies, error) {
 	if !ok {
 		return nil, fmt.Errorf("COOKIES_SECURE env variable is not set")
 	}
-	secure := secureStr != "0"
+	secure := secureStr != "0" && secureStr != ""
 
 	sameSiteStr, ok := os.LookupEnv("COOKIES_SAMESITE")
 	if !ok {
@@ -91,7 +90,7 @@ func (c *Cookies) Clear(w http.ResponseWriter) {
 	})
 }
 
-func (c *Cookies) Refresh(w http.ResponseWriter, token string) error {
+func (c *Cookies) Refresh(w http.ResponseWriter, token string, expires time.Time) error {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return fmt.Errorf("malformed JWT token generated")
@@ -101,7 +100,7 @@ func (c *Cookies) Refresh(w http.ResponseWriter, token string) error {
 		Name:     "auth",
 		Path:     "/",
 		Value:    header + "." + payload,
-		Expires:  time.Now().Add(c.jwt.tokenLifetime),
+		Expires:  expires,
 		Domain:   c.Domain,
 		Secure:   c.Secure,
 		SameSite: c.SameSite,
@@ -111,7 +110,7 @@ func (c *Cookies) Refresh(w http.ResponseWriter, token string) error {
 		Name:     "sign",
 		Path:     "/",
 		Value:    signature,
-		Expires:  time.Now().Add(c.jwt.tokenLifetime),
+		Expires:  expires,
 		HttpOnly: true,
 		Domain:   c.Domain,
 		Secure:   c.Secure,
@@ -119,26 +118,4 @@ func (c *Cookies) Refresh(w http.ResponseWriter, token string) error {
 		// Partitioned: true,
 	})
 	return nil
-}
-
-func (c *Cookies) ParsePlayerClaims(r *http.Request) (*PlayerClaims, error) {
-	authCookie, err := r.Cookie("auth")
-	if err != nil {
-		return nil, err
-	}
-	signCookie, err := r.Cookie("sign")
-	if err != nil {
-		return nil, err
-	}
-	token, err := c.jwt.ParseWithClaims(
-		authCookie.Value+"."+signCookie.Value, &PlayerClaims{},
-	)
-	if err != nil {
-		return nil, err
-	}
-	claims, ok := token.Claims.(*PlayerClaims)
-	if !ok {
-		return nil, fmt.Errorf("malformed claims")
-	}
-	return claims, nil
 }

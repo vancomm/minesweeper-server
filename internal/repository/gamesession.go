@@ -116,13 +116,13 @@ func (p UpdateGameSessionParams) SetClause() (string, map[string]any) {
 
 func (q Queries) UpdateGameSession(
 	ctx context.Context, gameSessionId int, params UpdateGameSessionParams,
-) error {
+) (*GameSession, error) {
 	setClause, args := params.SetClause()
 	args["game_session_id"] = gameSessionId
-	_, err := q.db.Exec(
+	rows, _ := q.db.Query(
 		ctx,
-		"UPDATE game_session SET "+setClause+" WHERE game_session_id = @game_session_id",
+		"UPDATE game_session SET "+setClause+" WHERE game_session_id = @game_session_id RETURNING *",
 		pgx.NamedArgs(args),
 	)
-	return err
+	return pgx.CollectExactlyOneRow(rows, pgx.RowToAddrOfStructByName[GameSession])
 }

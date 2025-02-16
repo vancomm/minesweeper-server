@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/rsa"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -13,7 +14,7 @@ type JWT struct {
 	publicKey     *rsa.PublicKey
 	privateKey    *rsa.PrivateKey
 	signingMethod jwt.SigningMethod
-	tokenLifetime time.Duration
+	TokenLifetime time.Duration
 }
 
 func loadPrivateKey() (*rsa.PrivateKey, error) {
@@ -63,7 +64,7 @@ func NewJWT() (*JWT, error) {
 		privateKey:    privateKey,
 		publicKey:     publicKey,
 		signingMethod: jwt.GetSigningMethod("RS256"),
-		tokenLifetime: time.Hour * 24 * 30,
+		TokenLifetime: time.Hour * 24 * 30,
 	}
 
 	return j, nil
@@ -85,4 +86,30 @@ func (j *JWT) ParseWithClaims(tokenString string, claims jwt.Claims) (*jwt.Token
 			return j.publicKey, nil
 		},
 	)
+}
+
+func (j *JWT) ParsePlayerClaims(r *http.Request) (*PlayerClaims, error) {
+	authCookie, err := r.Cookie("auth")
+	if err != nil {
+		return nil, err
+	}
+	signCookie, err := r.Cookie("sign")
+	if err != nil {
+		return nil, err
+	}
+	tokenString := authCookie.Value + "." + signCookie.Value
+	token, err := jwt.ParseWithClaims(
+		tokenString, &PlayerClaims{},
+		func(t *jwt.Token) (interface{}, error) {
+			return j.publicKey, nil
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	claims, ok := token.Claims.(*PlayerClaims)
+	if !ok {
+		return nil, fmt.Errorf("malformed claims")
+	}
+	return claims, nil
 }

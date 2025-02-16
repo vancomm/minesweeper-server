@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG GO_VERSION=1.23.2
+ARG GO_VERSION=1.24.0
 
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS build
 
@@ -30,12 +30,7 @@ RUN --mount=type=cache,target=/go/pkg/mod/ \
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     CGO_ENABLED=$CGO_ENABLED \
     GOARCH=$TARGETARCH \
-    go build -o ./bin/gateway ./cmd/gateway
-
-RUN --mount=type=cache,target=/go/pkg/mod/ \
-    CGO_ENABLED=$CGO_ENABLED \
-    GOARCH=$TARGETARCH \
-    go build -o ./bin/game ./cmd/game
+    go build -o ./bin/server ./cmd/server
 
 FROM debian:latest AS runtime
 
@@ -58,13 +53,9 @@ COPY --from=build \
 
 EXPOSE 8080
 
-FROM runtime AS gateway
+FROM runtime AS server
 
-ENTRYPOINT [ "/app/bin/gateway" ]
-
-FROM runtime AS game
-
-ENTRYPOINT [ "/app/bin/game" ]
+ENTRYPOINT [ "/app/bin/server" ]
 
 FROM runtime AS migrator
 

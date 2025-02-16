@@ -37,8 +37,10 @@ func (g GameState) Bytes() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func NewGame(params *GameParams, x, y int, r *rand.Rand) (state *GameState, err error) {
-	defer func() {
+func NewGame(
+	params GameParams, x, y int, r *rand.Rand,
+) (state *GameState, err error) {
+	defer func() { // TODO remove panic() from internal/mines
 		var ae AssertionError
 		if r := recover(); r != nil {
 			if e, ok := r.(error); ok {
@@ -58,7 +60,7 @@ func NewGame(params *GameParams, x, y int, r *rand.Rand) (state *GameState, err 
 		playerGrid[i] = Unknown
 	}
 	state = &GameState{
-		GameParams: *params,
+		GameParams: params,
 		Grid:       grid,
 		PlayerGrid: playerGrid,
 	}

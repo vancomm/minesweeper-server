@@ -3,7 +3,6 @@ package main
 import (
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -12,6 +11,12 @@ import (
 )
 
 func (app application) handleMove(w http.ResponseWriter, r *http.Request) {
+	sessionId, err := app.getSessionId(r)
+	if err != nil {
+		app.notFound(w)
+		return
+	}
+
 	query := r.URL.Query()
 
 	move, err := decodeGameMove(query.Get("move"))
@@ -21,12 +26,6 @@ func (app application) handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p, err := decodePoint(query)
-	if err != nil {
-		app.badRequest(w)
-		return
-	}
-
-	sessionId, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		app.badRequest(w)
 		return
@@ -81,14 +80,14 @@ func (app application) handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = app.repo.UpdateGameSession(
+	session, err = app.repo.UpdateGameSession(
 		r.Context(),
 		session.GameSessionId,
 		repository.UpdateGameSessionParams{
-			State:   &b,
 			Dead:    &game.Dead,
 			Won:     &game.Won,
 			EndedAt: &session.EndedAt.Time,
+			State:   &b,
 		},
 	)
 	if err != nil {
@@ -102,5 +101,5 @@ func (app application) handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app.replyWith(w, dto)
+	app.replyWithJSON(w, dto)
 }

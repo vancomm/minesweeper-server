@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/vancomm/minesweeper-server/internal/config"
@@ -51,11 +52,11 @@ func (app *application) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = app.cookies.Refresh(w, token)
+	err = app.cookies.Refresh(w, token, time.Now().Add(app.jwt.TokenLifetime))
 	if err != nil {
 		app.internalError(w, "failed to set auth cookies", "error", err)
 		return
 	}
 
-	app.replyWith(w, "ok")
+	app.replyWithJSON(w, "ok")
 }

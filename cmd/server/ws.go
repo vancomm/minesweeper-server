@@ -76,21 +76,21 @@ func (game gameExecutor) forfeit() error {
 }
 
 func (game gameExecutor) execute(query string) error {
-	tokens := strings.Split(" ", query)
+	tokens := strings.Split(query, " ")
 	cmd, args := wsCommand(tokens[0]), tokens[1:]
 	switch cmd {
 	case wsNoop:
 		return nil
 	case wsOpen:
 		return game.openCell(args)
-	case "f":
+	case wsFlag:
 		return game.flagCell(args)
-	case "c":
+	case wsChord:
 		return game.chordCell(args)
-	case "r":
+	case wsForfeit:
 		return game.forfeit()
 	default:
-		return fmt.Errorf("unknown command")
+		return fmt.Errorf("unknown command '%s', args: %v", cmd, args)
 	}
 }
 
@@ -98,7 +98,7 @@ func (game gameExecutor) wsRunGameLoop(
 	ctx context.Context, conn *websocket.Conn, session *repository.GameSession,
 ) error {
 	for {
-		mt, buf, err := conn.ReadMessage()
+		mt, msgBuf, err := conn.ReadMessage()
 		if err != nil {
 			return err
 		}
@@ -106,7 +106,7 @@ func (game gameExecutor) wsRunGameLoop(
 			return nil
 		}
 
-		message := strings.TrimSpace(string(buf))
+		message := strings.TrimSpace(string(msgBuf))
 		lines := strings.Split(message, "\n")
 	LINES:
 		for _, line := range lines {
@@ -126,30 +126,34 @@ func (game gameExecutor) wsRunGameLoop(
 			return fmt.Errorf("unable to serialize game state: %w", err)
 		}
 
-		err = game.repo.UpdateGameSession(
+		session, err = game.repo.UpdateGameSession(
 			ctx,
 			session.GameSessionId,
 			repository.UpdateGameSessionParams{
-				State:   &stateBuf,
 				Dead:    &game.Dead,
 				Won:     &game.Won,
 				EndedAt: &session.EndedAt.Time,
+				State:   &stateBuf,
 			})
 		if err != nil {
 			return fmt.Errorf("unable to update session in db: %w", err)
 		}
 
-		if err := conn.WriteJSON(session); err != nil {
+		dto, err := NewGameSessionDTO(*session)
+		if err != nil {
+			return fmt.Errorf("failed to create game session dto: %w", err)
+		}
+
+		if err := conn.WriteJSON(dto); err != nil {
 			return fmt.Errorf("unable to write json: %w", err)
 		}
 	}
 }
 
 func (app application) wsConnect(w http.ResponseWriter, r *http.Request) {
-	sessionId, err := strconv.Atoi(r.PathValue("id"))
+	sessionId, err := app.getSessionId(r)
 	if err != nil {
-		app.badRequest(w)
-		app.logger.Debug("invalid session id")
+		app.notFound(w)
 		return
 	}
 
@@ -181,7 +185,7 @@ func (app application) wsConnect(w http.ResponseWriter, r *http.Request) {
 
 	game := newGameExecutor(&app, state)
 	if err := game.wsRunGameLoop(r.Context(), conn, session); err != nil {
-		if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+		if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
 			return
 		}
 		app.logger.Warn("error in ws loop", slog.Any("err", err))

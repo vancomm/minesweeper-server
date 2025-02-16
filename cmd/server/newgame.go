@@ -11,7 +11,7 @@ import (
 func (app application) handleNewGame(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
-	dto, err := decodeNewGame(query)
+	params, err := decodeGameParams(query)
 	if err != nil {
 		app.badRequest(w)
 		return
@@ -23,13 +23,13 @@ func (app application) handleNewGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gameParams := mines.GameParams(dto)
+	gameParams := mines.GameParams(params)
 	if !gameParams.PointInBounds(p.X, p.Y) {
 		app.badRequest(w)
 		return
 	}
 
-	game, err := mines.NewGame(&gameParams, p.X, p.Y, app.rnd)
+	game, err := mines.NewGame(gameParams, p.X, p.Y, app.rnd)
 	if err != nil {
 		app.internalError(w, "unable to generate a new game", slog.Any("error", err))
 		return
@@ -52,5 +52,5 @@ func (app application) handleNewGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app.replyWith(w, sessionDTO)
+	app.replyWithJSON(w, sessionDTO)
 }
