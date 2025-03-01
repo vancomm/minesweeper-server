@@ -74,12 +74,11 @@ func (g Grid) ToString(width int) string {
 	return b.String()
 }
 
-// panics [AssertionError]
 func (grid *Grid) knownCells(
 	w int, std *celltodo, ctx *mineCtx,
-	x, y int, mask word, mine bool,
-) {
-	var bit word = 1
+	x, y int, mask uint16, mine bool,
+) error {
+	var bit uint16 = 1
 	for yy := range 3 {
 		for xx := range 3 {
 			if mask&bit != 0 {
@@ -97,7 +96,7 @@ func (grid *Grid) knownCells(
 						(*grid)[i] = ctx.Open(x+xx, y+yy)
 
 						if (*grid)[i] == Flagged {
-							panic(AssertionError{"grid[i] != -1"})
+							return AssertionError{"grid[i] != -1"}
 						}
 					}
 					std.add(i)
@@ -106,4 +105,5 @@ func (grid *Grid) knownCells(
 			bit <<= 1
 		}
 	}
+	return nil
 }

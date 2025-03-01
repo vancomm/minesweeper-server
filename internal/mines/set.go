@@ -13,7 +13,7 @@ linked together into a to-do list.
 */
 type set struct {
 	x, y       int
-	mask       word
+	mask       uint16
 	mines      int
 	todo       bool
 	next, prev *set
@@ -72,10 +72,9 @@ func (ss *setstore) addTodo(s *set) {
 	s.todo = true
 }
 
-// panics [AssertionError]
-func (ss *setstore) add(x, y int, mask word, mines int) {
+func (ss *setstore) add(x, y int, mask uint16, mines int) error {
 	if mask == 0 { // assert mask != 0
-		panic(AssertionError{"mask cannot be 0"})
+		return AssertionError{"mask cannot be 0"}
 	}
 
 	/*
@@ -106,7 +105,7 @@ func (ss *setstore) add(x, y int, mask word, mines int) {
 		/*
 		 * This set already existed! Free it and return.
 		 */
-		return
+		return nil
 	}
 
 	/*
@@ -114,6 +113,7 @@ func (ss *setstore) add(x, y int, mask word, mines int) {
 	 * list.
 	 */
 	ss.addTodo(s)
+	return nil
 }
 
 /*
@@ -149,7 +149,7 @@ func (ss *setstore) remove(s *set) {
 Return a dynamically allocated list of all the sets which
 overlap a provided input set.
 */
-func (ss *setstore) overlap(x, y int, mask word) (ret []*set) {
+func (ss *setstore) overlap(x, y int, mask uint16) (ret []*set) {
 	for xx := x - 3; xx < x+3; xx++ {
 		for yy := y - 3; yy < y+3; yy++ {
 			/*
@@ -208,7 +208,7 @@ Take two input sets, in the form (x,y,mask). Munge the first by
 taking either its intersection with the second or its difference
 with the second. Return the new mask part of the first set.
 */
-func setMunge(x1, y1 int, mask1 word, x2, y2 int, mask2 word, diff bool) word {
+func setMunge(x1, y1 int, mask1 uint16, x2, y2 int, mask2 uint16, diff bool) uint16 {
 	/*
 	 * Adjust the second set so that it has the same x,y
 	 * coordinates as the first.
@@ -218,25 +218,25 @@ func setMunge(x1, y1 int, mask1 word, x2, y2 int, mask2 word, diff bool) word {
 	} else {
 		for x2 > x1 {
 			m := (^(4 | 32 | 256))
-			mask2 &= word(m)
+			mask2 &= uint16(m)
 			mask2 <<= 1
 			x2--
 		}
 		for x2 < x1 {
 			m := ^(1 | 8 | 64)
-			mask2 &= word(m)
+			mask2 &= uint16(m)
 			mask2 >>= 1
 			x2++
 		}
 		for y2 > y1 {
 			m := ^(64 | 128 | 256)
-			mask2 &= word(m)
+			mask2 &= uint16(m)
 			mask2 <<= 3
 			y2--
 		}
 		for y2 < y1 {
 			m := ^(1 | 2 | 4)
-			mask2 &= word(m)
+			mask2 &= uint16(m)
 			mask2 >>= 3
 			y2++
 		}

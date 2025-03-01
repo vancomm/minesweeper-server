@@ -3,6 +3,7 @@
 package mines
 
 import (
+	"math/bits"
 	"math/rand/v2"
 	"strconv"
 )
@@ -35,8 +36,6 @@ func (r solveResult) String() string {
 }
 
 /*
-panics [AssertionError]
-
 Main solver entry point. You give it a grid of existing
 knowledge (-1 for a square known to be a mine, 0-8 for empty
 squares with a given number of neighbours, -2 for completely
@@ -57,7 +56,7 @@ func mineSolve(
 	grid Grid,
 	ctx *mineCtx,
 	r *rand.Rand,
-) solveResult {
+) (solveResult, error) {
 	ss := newSetStore()
 	nperturbs := 0
 
@@ -110,8 +109,8 @@ func mineSolve(
 				 * around this one, and determine its mine count.
 				 */
 				var (
-					bit word = 1
-					val word = 0
+					bit uint16 = 1
+					val uint16 = 0
 				)
 				for dy := -1; dy <= +1; dy++ {
 					for dx := -1; dx <= +1; dx++ {
@@ -184,12 +183,15 @@ func mineSolve(
 			 * Firstly, see if this set has a mine count of zero or
 			 * of its own cardinality.
 			 */
-			if s.mines == 0 || s.mines == s.mask.bitCount() {
+			if s.mines == 0 || s.mines == bits.OnesCount16(s.mask) {
 				/*
 				 * If so, we can immediately mark all the squares
 				 * in the set as known.
 				 */
-				grid.knownCells(w, std, ctx, s.x, s.y, s.mask, s.mines != 0)
+				err := grid.knownCells(w, std, ctx, s.x, s.y, s.mask, s.mines != 0)
+				if err != nil {
+					return NA, err
+				}
 
 				/*
 				 * Having done that, we need do nothing further
@@ -219,8 +221,8 @@ func mineSolve(
 				 */
 				swing := setMunge(s.x, s.y, s.mask, s2.x, s2.y, s2.mask, true)
 				s2wing := setMunge(s2.x, s2.y, s2.mask, s.x, s.y, s.mask, true)
-				swc := swing.bitCount()
-				s2wc := s2wing.bitCount()
+				swc := bits.OnesCount16(swing)
+				s2wc := bits.OnesCount16(s2wing)
 
 				/*
 				 * If one set has more mines than the other, and
@@ -230,12 +232,22 @@ func mineSolve(
 				 * every square in the other wing as known clear.
 				 */
 				if (swc == s.mines-s2.mines) || (s2wc == s2.mines-s.mines) {
-					grid.knownCells(w, std, ctx,
+					err := grid.knownCells(
+						w, std, ctx,
 						s.x, s.y, swing,
-						(swc == s.mines-s2.mines))
-					grid.knownCells(w, std, ctx,
+						(swc == s.mines-s2.mines),
+					)
+					if err != nil {
+						return NA, err
+					}
+					err = grid.knownCells(
+						w, std, ctx,
 						s2.x, s2.y, s2wing,
-						(s2wc == s2.mines-s.mines))
+						(s2wc == s2.mines-s.mines),
+					)
+					if err != nil {
+						return NA, err
+					}
 					continue
 				}
 
@@ -307,8 +319,13 @@ func mineSolve(
 			if minesleft == 0 || minesleft == squaresleft {
 				for i := range w * h {
 					if grid[i] == Unknown {
-						grid.knownCells(w, std, ctx,
-							i%w, i/w, 1, minesleft != 0)
+						err := grid.knownCells(
+							w, std, ctx,
+							i%w, i/w, 1, minesleft != 0,
+						)
+						if err != nil {
+							return NA, err
+						}
 					}
 				}
 				continue /* now go back to main deductive loop */
@@ -404,7 +421,7 @@ func mineSolve(
 							 * appropriately.
 							 */
 							minesleft -= sets[cursor].mines
-							squaresleft -= sets[cursor].mask.bitCount()
+							squaresleft -= bits.OnesCount16(sets[cursor].mask)
 						}
 						setused[cursor] = ok
 						cursor++
@@ -443,10 +460,13 @@ func mineSolve(
 										}
 									}
 									if outside {
-										grid.knownCells(
+										err := grid.knownCells(
 											w, std, ctx,
 											x, y, 1, minesleft != 0,
 										)
+										if err != nil {
+											return NA, err
+										}
 									}
 								}
 							}
@@ -471,7 +491,7 @@ func mineSolve(
 							 * squaresleft.
 							 */
 							minesleft += sets[cursor].mines
-							squaresleft += sets[cursor].mask.bitCount()
+							squaresleft += bits.OnesCount16(sets[cursor].mask)
 							setused[cursor] = false
 							cursor++
 						} else {
@@ -501,7 +521,7 @@ func mineSolve(
 		 */
 		nperturbs++
 		var changes []*perturbChange
-
+		var err error
 		/*
 		 * Choose a set at random from the current selection,
 		 * and ask the perturb function to either fill or empty
@@ -510,10 +530,13 @@ func mineSolve(
 		 * If we have no sets at all, we must give up.
 		 */
 		if c := ss.sets.Count(); c == 0 {
-			changes = ctx.Perturb(&grid, 0, 0, 0, r)
+			changes, err = ctx.perturb(&grid, 0, 0, 0, r)
 		} else {
 			s := ss.sets.Index(r.IntN(c))
-			changes = ctx.Perturb(&grid, s.x, s.y, s.mask, r)
+			changes, err = ctx.perturb(&grid, s.x, s.y, s.mask, r)
+		}
+		if err != nil {
+			return NA, err
 		}
 		if len(changes) > 0 {
 			/*
@@ -564,5 +587,5 @@ func mineSolve(
 		}
 	}
 
-	return solveResult(nperturbs)
+	return solveResult(nperturbs), nil
 }

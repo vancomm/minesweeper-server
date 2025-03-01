@@ -5,7 +5,6 @@ import (
 	"math/rand/v2"
 )
 
-// panics [AssertionError]
 func (p GameParams) newSolvableGrid(startX, startY int, r *rand.Rand) (grid []bool, err error) {
 	width, height, mineCount, _ := p.Unpack()
 
@@ -73,11 +72,16 @@ func (p GameParams) newSolvableGrid(startX, startY int, r *rand.Rand) (grid []bo
 				solveGrid[startY*width+startX] = ctx.Open(startX, startY)
 
 				if solveGrid[startY*width+startX] != 0 {
-					Log.Error("asseertion failed: mine in first square", "solveGrid", solveGrid, "ctx", ctx)
-					panic(AssertionError{"mine in first square"})
+					Log.Error("assertion failed: mine in first square", "solveGrid", solveGrid, "ctx", ctx)
+					grid = nil
+					err = AssertionError{"mine in first square"}
+					return
 				}
 
-				solveRet := mineSolve(width, height, mineCount, solveGrid, ctx, r)
+				solveRet, err := mineSolve(width, height, mineCount, solveGrid, ctx, r)
+				if err != nil {
+					return nil, err
+				}
 				if solveRet < 0 || prevRet >= 0 && solveRet >= prevRet {
 					success = false
 					break

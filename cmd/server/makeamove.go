@@ -70,7 +70,7 @@ func (app application) handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if game.Won || game.Dead {
-		game.Forfeit()
+		game.RevealPlayerGrid()
 		session.EndedAt.Time = time.Now().UTC()
 	}
 

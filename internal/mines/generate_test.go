@@ -15,7 +15,7 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func TestGenAll(t *testing.T) {
+func TestSolvableGridGeneration(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
@@ -55,15 +55,13 @@ func TestGenAll(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			params := test.params
 			r := rand.New(rand.NewPCG(1, 2))
-			for sx := 0; sx < params.Width; sx++ {
-				for sy := 0; sy < params.Height; sy++ {
-					t.Logf("%s @ %d:%d", test.name, sx, sy)
-					_, err := params.newSolvableGrid(sx, sy, r)
+			for sx := range test.params.Width {
+				for sy := range test.params.Height {
+					_, err := test.params.newSolvableGrid(sx, sy, r)
 					if err != nil {
 						t.Log(err)
-						t.Errorf("could not generate game field %s", test.name)
+						t.Errorf("could not generate game %s @ %d:%d", test.name, sx, sy)
 					}
 				}
 			}

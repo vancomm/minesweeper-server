@@ -103,8 +103,6 @@ func (p *perturbChange) String() string {
 }
 
 /*
-panics [AssertionError]
-
 Normally this function is passed an (x,y,mask) set description.
 On occasions, though, there is no _localised_ set being used,
 and the set being perturbed is supposed to be the entirety of
@@ -120,11 +118,11 @@ less dense than one might like. Therefore, to improve overall
 grid quality I disable this feature for the first few attempts,
 and fall back to it after no useful grid has been generated.
 */
-func (ctx *mineCtx) Perturb(
-	grid *Grid, setX, setY int, mask word, r *rand.Rand,
-) []*perturbChange {
+func (ctx *mineCtx) perturb(
+	grid *Grid, setX, setY int, mask uint16, r *rand.Rand,
+) ([]*perturbChange, error) {
 	if mask == 0 && !ctx.allowBigPerturbs {
-		return nil
+		return nil, nil
 	}
 
 	/*
@@ -211,7 +209,7 @@ func (ctx *mineCtx) Perturb(
 					// assert(sety+dy <= ctx->h);
 					if setX+dx > ctx.width || setY+dy > ctx.height {
 						Log.Error("out of range", "dx", dx, "dy", dy, "ctx", ctx)
-						panic(AssertionError{"out of range"})
+						return nil, AssertionError{"out of range"}
 					}
 					if ctx.MineAt(setX+dx, setY+dy) {
 						nfull++
@@ -278,7 +276,7 @@ func (ctx *mineCtx) Perturb(
 	if len(toFill) != nfull && len(toEmpty) != nempty {
 		if len(toEmpty) == 0 { // assert(ntoempty != 0)
 			Log.Error("toEmpty cannot be empty", "toEmpty", toEmpty, "toFill", toFill)
-			panic(AssertionError{"toEmpty cannot be empty"})
+			return nil, AssertionError{"toEmpty cannot be empty"}
 		}
 
 		setlist = make([]int, 0, ctx.width*ctx.height)
@@ -291,7 +289,7 @@ func (ctx *mineCtx) Perturb(
 						// assert(sety+dy <= ctx->h);
 						if setX+dx > ctx.width || setY+dy > ctx.height {
 							Log.Error("out of range", "dx", dx, "dy", dy, "ctx", ctx)
-							panic(AssertionError{"out of range"})
+							return nil, AssertionError{"out of range"}
 						}
 						if !ctx.MineAt(setX+dx, setY+dy) {
 							setlist = append(setlist, (setY+dy)*ctx.width+(setX+dx))
@@ -316,7 +314,7 @@ func (ctx *mineCtx) Perturb(
 			Log.Error("setlist cannot be smaller than toEmpty", "setlist", setlist,
 				"toEmpty", toEmpty,
 				"toFill", toFill)
-			panic(AssertionError{"setlist cannot be smaller than toEmpty"})
+			return nil, AssertionError{"setlist cannot be smaller than toEmpty"}
 		}
 
 		/*
@@ -375,7 +373,7 @@ func (ctx *mineCtx) Perturb(
 		// assert(todo == toempty)
 		if !reflect.DeepEqual(todos, toEmpty) {
 			Log.Error("todo must deep equal toEmpty", "todos", todos, "toEmpty", toEmpty)
-			panic(AssertionError{"todo must deep equal toEmpty"})
+			return nil, AssertionError{"todo must deep equal toEmpty"}
 		}
 
 		for j := range toEmpty {
@@ -431,7 +429,7 @@ func (ctx *mineCtx) Perturb(
 	// assert(i == ret->n)
 	if len(changes) != 2*len(todos) {
 		Log.Error("not all perturbations have generated", "todos", todos, "changes", changes)
-		panic(AssertionError{"not all perturbations have generated"})
+		return nil, AssertionError{"not all perturbations have generated"}
 	}
 
 	squares = nil
@@ -456,7 +454,7 @@ func (ctx *mineCtx) Perturb(
 		if delta.PlacesMine() == ctx.MineAt(x, y) {
 			Log.Error("trying to add an existing mine or remove an absent one",
 				"change", c, "mine", ctx.MineAt(x, y))
-			panic(AssertionError{"trying to add an existing mine or remove an absent one"})
+			return nil, AssertionError{"trying to add an existing mine or remove an absent one"}
 		}
 
 		/*
@@ -503,5 +501,5 @@ func (ctx *mineCtx) Perturb(
 		}
 	}
 
-	return changes
+	return changes, nil
 }

@@ -5,7 +5,6 @@ package mines
 import (
 	"bytes"
 	"encoding/gob"
-	"errors"
 	"log/slog"
 	"math/rand/v2"
 )
@@ -37,20 +36,7 @@ func (g GameState) Bytes() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func NewGame(
-	params GameParams, x, y int, r *rand.Rand,
-) (state *GameState, err error) {
-	defer func() { // TODO remove panic() from internal/mines
-		var ae AssertionError
-		if r := recover(); r != nil {
-			if e, ok := r.(error); ok {
-				if errors.As(e, &ae) {
-					state, err = nil, ae
-				}
-			}
-		}
-	}()
-
+func NewGame(params GameParams, x, y int, r *rand.Rand) (state *GameState, err error) {
 	grid, err := params.newSolvableGrid(x, y, r)
 	if err != nil {
 		return nil, err
@@ -215,13 +201,6 @@ func (s *GameState) ChordCell(x, y int) {
 			}
 		}
 	}
-}
-
-func (s *GameState) Forfeit() {
-	if !(s.Dead || s.Won) {
-		s.Dead = true
-	}
-	s.RevealPlayerGrid()
 }
 
 func (s *GameState) RevealPlayerGrid() {

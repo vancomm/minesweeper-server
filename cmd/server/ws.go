@@ -18,11 +18,10 @@ import (
 type wsCommand string
 
 const (
-	wsNoop    wsCommand = "g"
-	wsOpen    wsCommand = "o"
-	wsFlag    wsCommand = "f"
-	wsChord   wsCommand = "c"
-	wsForfeit wsCommand = "r" // =)
+	wsNoop  wsCommand = "g"
+	wsOpen  wsCommand = "o"
+	wsFlag  wsCommand = "f"
+	wsChord wsCommand = "c"
 )
 
 type gameExecutor struct {
@@ -70,11 +69,6 @@ func (game gameExecutor) chordCell(args []string) error {
 	return nil
 }
 
-func (game gameExecutor) forfeit() error {
-	game.Forfeit()
-	return nil
-}
-
 func (game gameExecutor) execute(query string) error {
 	tokens := strings.Split(query, " ")
 	cmd, args := wsCommand(tokens[0]), tokens[1:]
@@ -87,8 +81,6 @@ func (game gameExecutor) execute(query string) error {
 		return game.flagCell(args)
 	case wsChord:
 		return game.chordCell(args)
-	case wsForfeit:
-		return game.forfeit()
 	default:
 		return fmt.Errorf("unknown command '%s', args: %v", cmd, args)
 	}
