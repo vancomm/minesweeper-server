@@ -24,7 +24,8 @@ func (app application) handleFetchHighScore(w http.ResponseWriter, r *http.Reque
 	}
 
 	if query.Has("username") {
-		(*filter.Username) = query.Get("username")
+		username := query.Get("username")
+		filter.Username = &username
 	}
 
 	highscores, err := app.repo.GetHighscores(r.Context(), filter)

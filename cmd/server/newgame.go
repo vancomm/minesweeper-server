@@ -37,7 +37,7 @@ func (app application) handleNewGame(w http.ResponseWriter, r *http.Request) {
 
 	var sessionParams repository.CreateGameSessionParams
 	if playerId, ok := app.getAuthenticatedPlayerId(r); ok {
-		(*sessionParams.PlayerId) = int(playerId)
+		sessionParams.PlayerId = &playerId
 	}
 
 	session, err := app.repo.CreateGameSession(r.Context(), game, sessionParams)

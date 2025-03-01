@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"hash/maphash"
 	"log/slog"
-	"math/rand/v2"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,12 +17,6 @@ import (
 	"github.com/vancomm/minesweeper-server/internal/middleware"
 	"github.com/vancomm/minesweeper-server/internal/repository"
 )
-
-func createRand() *rand.Rand {
-	return rand.New(rand.NewPCG(
-		new(maphash.Hash).Sum64(), new(maphash.Hash).Sum64(),
-	))
-}
 
 func main() {
 	var handler slog.Handler = slog.NewJSONHandler(os.Stderr, nil)

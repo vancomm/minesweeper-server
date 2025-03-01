@@ -5,6 +5,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Database struct {
@@ -83,7 +85,7 @@ func NewDatabase() (*Database, error) {
 	return config, nil
 }
 
-func (c *Database) URL() string {
+func (c Database) URL() string {
 	return fmt.Sprintf(
 		"postgresql://%s:%s@%s:%d/%s?sslmode=%s",
 		c.Username,
@@ -100,4 +102,32 @@ func (c Database) DSN() string {
 		"user=%s password=%s host=%s port=%d dbname=%s sslmode=%s",
 		c.Username, c.Password, c.Host, c.Port, c.DBName, c.SSLMode,
 	)
+}
+
+func DbURL() (string, error) {
+	dbURL, ok := os.LookupEnv("DATABASE_URL")
+	if ok {
+		return dbURL, nil
+	}
+
+	cfg, err := NewDatabase()
+	if err == nil {
+		return cfg.URL(), nil
+	}
+
+	return "", fmt.Errorf("no DATABASE_URL set; %w", err)
+}
+
+func NewPgxpoolConfig() (*pgxpool.Config, error) {
+	dbURL, ok := os.LookupEnv("DATABASE_URL")
+	if ok {
+		return pgxpool.ParseConfig(dbURL)
+	}
+
+	cfg, err := NewDatabase()
+	if err == nil {
+		return pgxpool.ParseConfig(cfg.DSN())
+	}
+
+	return nil, fmt.Errorf("no DATABASE_URL set; %w", err)
 }
