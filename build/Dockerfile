@@ -36,7 +36,10 @@ FROM debian:latest AS runtime
 
 WORKDIR /app
 
-ARG UID=10001
+ARG OS_GROUP_ID=42000
+ARG OS_GROUP_NAME=mines
+ARG OS_UID=10000
+ARG OS_USER_NAME=minesapp
 
 RUN adduser \
     --disabled-password \
@@ -44,9 +47,12 @@ RUN adduser \
     --home "/nonexistent" \
     --shell "/sbin/nologin" \
     --no-create-home \
-    --uid "${UID}" \
-    appuser
-USER appuser
+    --uid "${OS_UID}" \
+    "${OS_USER_NAME}"   
+RUN groupadd -g "${OS_GROUP_ID}" "${OS_GROUP_NAME}"
+RUN usermod -aG "${OS_GROUP_NAME}" "${OS_USER_NAME}"
+
+USER "${OS_USER_NAME}"
 
 COPY --from=build \
     /app/bin /app/bin

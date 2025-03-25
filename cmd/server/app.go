@@ -39,6 +39,7 @@ func (app application) Router() *mux.Router {
 	})
 	router.HandleFunc("/login", app.handleLogin)
 	router.HandleFunc("/register", app.handleRegister)
+	router.HandleFunc("/logout", app.handleLogout)
 
 	return router
 }

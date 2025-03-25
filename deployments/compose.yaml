@@ -2,7 +2,7 @@ name: minesweeper-server
 
 services:
   db:
-    image: postgres
+    image: postgres:17.4
     container_name: mines-db
     restart: unless-stopped
     healthcheck:
@@ -73,7 +73,7 @@ services:
       - POSTGRES_DB=app
       - POSTGRES_PORT=5432
       - POSTGRES_SSLMODE=disable
-      - COOKIES_DOMAIN="vancommdot.com"
+      - COOKIES_DOMAIN=vancommdot.com
       - COOKIES_SECURE="1"
       - COOKIES_SAMESITE=strict
       - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password_file

@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -35,7 +34,7 @@ func loadPassword() (string, error) {
 		return "", fmt.Errorf("unable to read from password file: %w", err)
 	}
 
-	return strings.TrimSpace(string(data)), nil
+	return string(data), nil
 }
 
 func NewDatabase() (*Database, error) {

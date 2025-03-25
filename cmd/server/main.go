@@ -10,7 +10,6 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/lmittmann/tint"
 	"github.com/vancomm/minesweeper-server/internal/config"
 	"github.com/vancomm/minesweeper-server/internal/database"
@@ -64,7 +63,7 @@ func main() {
 		rnd:     createRand(),
 	}
 	router := app.Router()
-	router.Use(mux.CORSMethodMiddleware(router), middleware.Logging(logger))
+	router.Use(middleware.Cors(), middleware.Logging(logger))
 	server := &http.Server{
 		Addr:         port,
 		WriteTimeout: time.Second * 15,
