@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -89,7 +90,7 @@ func (c Database) URL() string {
 	return fmt.Sprintf(
 		"postgresql://%s:%s@%s:%d/%s?sslmode=%s",
 		c.Username,
-		c.Password,
+		url.QueryEscape(c.Password),
 		c.Host,
 		c.Port,
 		c.DBName,

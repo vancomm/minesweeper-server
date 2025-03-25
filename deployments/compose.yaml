@@ -7,11 +7,9 @@ services:
     restart: unless-stopped
     healthcheck:
       test: [
-          "CMD-SHELL", 
-          "psql -U $$POSTGRES_USER \
-            -d $$POSTGRES_DB \
-            -c 'select 1' || exit 1",
-        ]
+          "CMD-SHELL",
+          "psql -U $$POSTGRES_USER -d $$POSTGRES_DB -c 'select 1' || exit 1", 
+      ]
       interval: 3s
       timeout: 30s
       retries: 5
@@ -19,37 +17,40 @@ services:
       - "54320:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+      - ${POSTGRES_PASSWORD_FILE}:/run/secrets/postgres_password_file
     environment:
       - POSTGRES_DB=app
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=5uL3KkJrlViMQoqR
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password_file
 
   migrator:
     build:
       context: ..
       dockerfile: build/Dockerfile
       target: migrator
-    image: vancomm/mines-migrator:dev
+    image: vancomm/mines-migrator:production
     container_name: mines-migrator
     links:
       - db
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - ${POSTGRES_PASSWORD_FILE}:/run/secrets/postgres_password_file
     environment:
-      - DEVELOPMENT=1
       - POSTGRES_HOST=db
-      - POSTGRES_PASSWORD=5uL3KkJrlViMQoqR
       - POSTGRES_USER=postgres
       - POSTGRES_DB=app
       - POSTGRES_PORT=5432
       - POSTGRES_SSLMODE=disable
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password_file
       
   server:
     build:
       context: ..
       dockerfile: build/Dockerfile
-    image: vancomm/mines-server:dev
+      target: server
+    image: vancomm/mines-server:production
     container_name: mines-server
     ports:
       - "8080:8080"
@@ -58,33 +59,26 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+    volumes:
+      - ${POSTGRES_PASSWORD_FILE}:/run/secrets/postgres_password_file
+      - ${JWT_PRIVATE_KEY_FILE}:/run/secrets/jwt_private_key_file
+      - ${JWT_PUBLIC_KEY_FILE}:/run/secrets/jwt_public_key_file
     environment:
-      - APP_MOUNT=/api/v1
+      - APP_MOUNT=/mines/v1
       - APP_PORT=:8080
-      - DEVELOPMENT=1
       - POSTGRES_HOST=db
-      - POSTGRES_PASSWORD=5uL3KkJrlViMQoqR
       - POSTGRES_USER=postgres
       - POSTGRES_DB=app
       - POSTGRES_PORT=5432
       - POSTGRES_SSLMODE=disable
-      - COOKIES_DOMAIN=""
-      - COOKIES_SECURE=""
-      - COOKIES_SAMESITE=none
+      - COOKIES_DOMAIN="vancommdot.com"
+      - COOKIES_SECURE="1"
+      - COOKIES_SAMESITE=strict
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password_file
       - JWT_PRIVATE_KEY_FILE=/run/secrets/jwt_private_key_file
       - JWT_PUBLIC_KEY_FILE=/run/secrets/jwt_public_key_file
-    secrets:
-      - jwt_private_key_file
-      - jwt_public_key_file
   
 volumes:
   db_data:
-
-# https://docs.docker.com/compose/how-tos/use-secrets/#use-secrets
-# "Secrets are mounted as a file in /run/secrets/<secret_name> inside the
-# container."
-secrets:
-  jwt_private_key_file:
-    file: ../run/secrets/jwt-private-key.pem
-  jwt_public_key_file:
-    file: ../run/secrets/jwt-public-key.pem
