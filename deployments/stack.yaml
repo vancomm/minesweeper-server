@@ -1,5 +1,3 @@
-name: minesweeper-server
-
 services:
   db:
     image: postgres:17.4
@@ -17,11 +15,13 @@ services:
       - "54320:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    secrets:
+      - postgres-password
     environment:
       - POSTGRES_DB=app
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password_file
-     
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres-password
+      
   server:
     build:
       context: ..
@@ -34,12 +34,11 @@ services:
     links:
       - db
     depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ${POSTGRES_PASSWORD_FILE}:/run/secrets/postgres_password_file
-      - ${JWT_PRIVATE_KEY_FILE}:/run/secrets/jwt_private_key_file
-      - ${JWT_PUBLIC_KEY_FILE}:/run/secrets/jwt_public_key_file
+      - db
+    secrets:
+      - postgres-password
+      - jwt-private-key
+      - jwt-public-key
     environment:
       - APP_MOUNT=/mines/v1
       - APP_PORT=:8080
@@ -51,9 +50,20 @@ services:
       - COOKIES_DOMAIN=vancommdot.com
       - COOKIES_SECURE="1"
       - COOKIES_SAMESITE=strict
-      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password_file
-      - JWT_PRIVATE_KEY_FILE=/run/secrets/jwt_private_key_file
-      - JWT_PUBLIC_KEY_FILE=/run/secrets/jwt_public_key_file
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres-password
+      - JWT_PRIVATE_KEY_FILE=/run/secrets/jwt-private-key
+      - JWT_PUBLIC_KEY_FILE=/run/secrets/jwt-public-key
   
 volumes:
   db_data:
+
+secrets:
+  postgres-password:
+    external:
+      true
+  jwt-private-key:
+    external:
+      true
+  jwt-public-key:
+    external:
+      true

@@ -4,7 +4,6 @@ services:
   db:
     image: postgres
     container_name: mines-db
-    restart: unless-stopped
     healthcheck:
       test: [
           "CMD-SHELL",
@@ -22,27 +21,6 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=5uL3KkJrlViMQoqR
 
-  migrator:
-    build:
-      context: ..
-      dockerfile: build/Dockerfile
-      target: migrator
-    image: vancomm/mines-migrator:dev
-    container_name: mines-migrator
-    links:
-      - db
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      - DEVELOPMENT=1
-      - POSTGRES_HOST=db
-      - POSTGRES_PASSWORD=5uL3KkJrlViMQoqR
-      - POSTGRES_USER=postgres
-      - POSTGRES_DB=app
-      - POSTGRES_PORT=5432
-      - POSTGRES_SSLMODE=disable
-
   server:
     build:
       context: ..
@@ -56,8 +34,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      migrator:
-        condition: service_completed_successfully
     volumes:
       - ../:/app
     environment:

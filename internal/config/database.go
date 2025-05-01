@@ -87,7 +87,7 @@ func NewDatabase() (*Database, error) {
 
 func (c Database) URL() string {
 	return fmt.Sprintf(
-		"postgresql://%s:%s@%s:%d/%s?sslmode=%s",
+		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
 		c.Username,
 		url.QueryEscape(c.Password),
 		c.Host,
@@ -119,15 +119,10 @@ func DbURL() (string, error) {
 }
 
 func NewPgxpoolConfig() (*pgxpool.Config, error) {
-	dbURL, ok := os.LookupEnv("DATABASE_URL")
-	if ok {
-		return pgxpool.ParseConfig(dbURL)
+	dbURL, err := DbURL()
+	if err != nil {
+		return nil, err
 	}
+	return pgxpool.ParseConfig(dbURL)
 
-	cfg, err := NewDatabase()
-	if err == nil {
-		return pgxpool.ParseConfig(cfg.DSN())
-	}
-
-	return nil, fmt.Errorf("no DATABASE_URL set; %w", err)
 }

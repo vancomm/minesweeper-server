@@ -32,7 +32,7 @@ RUN --mount=type=cache,target=/go/pkg/mod/ \
     GOARCH=$TARGETARCH \
     go build -o ./bin/server ./cmd/server
 
-FROM debian:latest AS runtime
+FROM debian:12.10-slim@sha256:b1211f6d19afd012477bd34fdcabb6b663d680e0f4b0537da6e6b0fd057a3ec3 AS runtime
 
 WORKDIR /app
 

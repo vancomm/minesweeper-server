@@ -24,6 +24,21 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 
 }
 
+func Migrate(url string, migrations fs.FS) (migrator *migrate.Migrate, err error) {
+	source, err := iofs.New(migrations, "migrations")
+	if err != nil {
+		return nil, fmt.Errorf("unable to create migrations iofs: %w", err)
+	}
+	migrator, err = migrate.NewWithSourceInstance("iofs", source, url)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create migrator: %w", err)
+	}
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return nil, fmt.Errorf("failed to migrate database: %w", err)
+	}
+	return migrator, nil
+}
+
 func ConnectAndMigrate(ctx context.Context, migrations fs.FS) (*pgxpool.Pool, *migrate.Migrate, error) {
 	conn, err := Connect(ctx)
 	if err != nil {
