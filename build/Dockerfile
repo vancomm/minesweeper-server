@@ -6,17 +6,14 @@ FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS build
 
 WORKDIR /app
 
+COPY go.mod go.sum /app/
+
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,source=go.sum,target=go.sum \
     --mount=type=bind,source=go.mod,target=go.mod \
     go mod download -x
 
-COPY . /app
-    
-RUN --mount=type=cache,target=/go/pkg/mod \
-    go install golang.org/x/tools/cmd/stringer
-
-RUN go generate ./...
+COPY . /app/
 
 ARG CGO_ENABLED=1
 
@@ -25,39 +22,33 @@ ARG TARGETARCH
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     CGO_ENABLED=$CGO_ENABLED \
     GOARCH=$TARGETARCH \
-    go build -o ./bin/migrator ./cmd/migrator
+    go build -o ./bin/server ./cmd/server \
+    && go build -o ./bin/migrator ./cmd/migrator
 
-RUN --mount=type=cache,target=/go/pkg/mod/ \
-    CGO_ENABLED=$CGO_ENABLED \
-    GOARCH=$TARGETARCH \
-    go build -o ./bin/server ./cmd/server
-
-FROM debian:latest AS runtime
+FROM debian:13 AS runtime
 
 WORKDIR /app
 
 ARG OS_GROUP_ID=42000
-ARG OS_GROUP_NAME=mines
+ARG OS_GROUP_NAME=minesapp
 ARG OS_UID=10000
 ARG OS_USER_NAME=minesapp
 
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "/nonexistent" \
+RUN groupadd \
+    --gid "${OS_GROUP_ID}" \
+    "${OS_GROUP_NAME}"
+
+RUN useradd \
+    --gid "${OS_GROUP_ID}" \
     --shell "/sbin/nologin" \
-    --no-create-home \
-    --uid "${OS_UID}" \
-    "${OS_USER_NAME}"   
-RUN groupadd -g "${OS_GROUP_ID}" "${OS_GROUP_NAME}"
-RUN usermod -aG "${OS_GROUP_NAME}" "${OS_USER_NAME}"
+    "${OS_USER_NAME}"
 
 USER "${OS_USER_NAME}"
 
 COPY --from=build \
     /app/bin /app/bin
 
-EXPOSE 8080
+EXPOSE 8000
 
 FROM runtime AS server
 

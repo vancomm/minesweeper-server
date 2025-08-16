@@ -1,18 +1,31 @@
 # minesweeper-server
 
-## how to run
+## installation and deployment
 
-### production
+### local
 
-```sh
-docker compose -f deployments/compose.yaml up --build
+```bash
+export TARGET_DIR="./run/secrets"
+./scripts/generate-jwt-keys.sh
+./scripts/generate-password.sh
+make dev
 ```
 
-### development (live reload)
+### remote
 
-```sh
-make keys # create JWT keys first time you run
-make dev
+```bash
+# on remote machine
+export TARGET_DIR="/var/lib/minesweeper"
+mkdir "$TARGET_DIR"
+./scripts/generate-jwt-keys.sh
+./scripts/generate-password.sh
+```
+
+```bash
+# on development machine
+export REMOTE_HOST="my-remote-host"
+./scripts/create-context.sh
+./scripts/remote-up.sh
 ```
 
 ## requirements
@@ -23,7 +36,6 @@ make dev
 - [air](https://github.com/air-verse/air)
 - openssh
 - openssl
-
 
 ## todo
 

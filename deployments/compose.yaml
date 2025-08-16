@@ -1,6 +1,41 @@
 name: minesweeper-server
 
 services:
+  server:
+    build:
+      context: ..
+      dockerfile: build/Dockerfile
+      target: server
+    image: vancomm/mines-server:production
+    container_name: mines-server
+    ports:
+      - "8000:8000"
+    links:
+      - db
+    depends_on:
+      db:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+    volumes:
+      - ${POSTGRES_PASSWORD_FILE}:/run/secrets/postgres_password_file
+      - ${JWT_PRIVATE_KEY_FILE}:/run/secrets/jwt_private_key_file
+      - ${JWT_PUBLIC_KEY_FILE}:/run/secrets/jwt_public_key_file
+    environment:
+      - APP_MOUNT=/mines/v1
+      - APP_PORT=:8000
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=app
+      - POSTGRES_PORT=5432
+      - POSTGRES_SSLMODE=disable
+      - COOKIES_DOMAIN=vancommdot.com
+      - COOKIES_SECURE="1"
+      - COOKIES_SAMESITE=strict
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password_file
+      - JWT_PRIVATE_KEY_FILE=/run/secrets/jwt_private_key_file
+      - JWT_PUBLIC_KEY_FILE=/run/secrets/jwt_public_key_file
+  
   db:
     image: postgres:17.4
     container_name: mines-db
@@ -45,40 +80,6 @@ services:
       - POSTGRES_SSLMODE=disable
       - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password_file
       
-  server:
-    build:
-      context: ..
-      dockerfile: build/Dockerfile
-      target: server
-    image: vancomm/mines-server:production
-    container_name: mines-server
-    ports:
-      - "8080:8080"
-    links:
-      - db
-    depends_on:
-      db:
-        condition: service_healthy
-      migrator:
-        condition: service_completed_successfully
-    volumes:
-      - ${POSTGRES_PASSWORD_FILE}:/run/secrets/postgres_password_file
-      - ${JWT_PRIVATE_KEY_FILE}:/run/secrets/jwt_private_key_file
-      - ${JWT_PUBLIC_KEY_FILE}:/run/secrets/jwt_public_key_file
-    environment:
-      - APP_MOUNT=/mines/v1
-      - APP_PORT=:8080
-      - POSTGRES_HOST=db
-      - POSTGRES_USER=postgres
-      - POSTGRES_DB=app
-      - POSTGRES_PORT=5432
-      - POSTGRES_SSLMODE=disable
-      - COOKIES_DOMAIN=vancommdot.com
-      - COOKIES_SECURE="1"
-      - COOKIES_SAMESITE=strict
-      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password_file
-      - JWT_PRIVATE_KEY_FILE=/run/secrets/jwt_private_key_file
-      - JWT_PUBLIC_KEY_FILE=/run/secrets/jwt_public_key_file
   
 volumes:
   db_data:
