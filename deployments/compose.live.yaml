@@ -37,7 +37,6 @@ services:
   db:
     image: postgres
     container_name: mines-db
-    restart: unless-stopped
     healthcheck:
       test: [
           "CMD-SHELL",
@@ -70,10 +69,10 @@ services:
     environment:
       - DEVELOPMENT=1
       - POSTGRES_HOST=db
-      - POSTGRES_PASSWORD=5uL3KkJrlViMQoqR
-      - POSTGRES_USER=postgres
-      - POSTGRES_DB=app
       - POSTGRES_PORT=5432
+      - POSTGRES_DB=app
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=5uL3KkJrlViMQoqR
       - POSTGRES_SSLMODE=disable
 
 
